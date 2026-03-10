@@ -1,0 +1,59 @@
+Airports
+Amusement Park
+Aquarium
+Apartment Complex
+Auditoriums
+Arena
+Bank
+Bar
+Businesses
+Cafeterias
+Camping Site
+Casino
+Church
+Clinic
+College
+Community Center
+Convention Center
+Correctional Facility
+Courthouse
+Dentist
+Doctor
+Factory
+Fire Station
+Gas Station
+Golf Course
+Government Building
+Grocery or Supermarket
+Gym or Sports Club
+Hospital
+Library
+Lodging / Hotel
+Long Term Care Facility
+Medical Care
+Movie Theater
+Museum
+Music Venue
+Night Club
+Office
+Park
+Parking Area
+Police Station
+Post Office
+Preschool / Nursery
+Public Transit Station
+Recreation Center
+Residential Home
+Restaurant
+Retirement Community
+RV Park
+Schools
+Senior Center
+Shopping malls
+Stadium
+Theater
+University
+Veterinarian
+Warehouse
+Water Park
+Zoo
