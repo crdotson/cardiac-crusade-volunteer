@@ -47,6 +47,14 @@ button.secondary {
   background-color: var(--gray);
 }
 
+button.danger {
+  background-color: #dc3545;
+}
+
+button.danger:hover {
+  background-color: #c82333;
+}
+
 input, select {
   padding: 0.5rem;
   border: 1px solid var(--light-gray);

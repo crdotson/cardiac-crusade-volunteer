@@ -8,21 +8,33 @@ const Settings: FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [googleApiKey, setGoogleApiKey] = useState('');
   const [googlePlacesLimit, setGooglePlacesLimit] = useState('10');
+  const [credentials, setCredentials] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const { user } = useAuth();
 
+  const fetchSettings = async () => {
+    try {
+      const res = await axios.get('api/settings');
+      setGoogleApiKey(res.data.google_api_key || '');
+      setGooglePlacesLimit(res.data.google_places_limit || '10');
+    } catch (err) {
+      console.error('Failed to fetch settings');
+    }
+  };
+
+  const fetchCredentials = async () => {
+    try {
+      const res = await axios.get('api/auth/fido2/credentials');
+      setCredentials(res.data);
+    } catch (err) {
+      console.error('Failed to fetch credentials');
+    }
+  };
+
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await axios.get('api/settings');
-        setGoogleApiKey(res.data.google_api_key || '');
-        setGooglePlacesLimit(res.data.google_places_limit || '10');
-      } catch (err) {
-        console.error('Failed to fetch settings');
-      }
-    };
     fetchSettings();
+    fetchCredentials();
   }, []);
 
   const handleChangePassword = async (e: FormEvent) => {
@@ -59,6 +71,10 @@ const Settings: FC = () => {
   const handleRegisterPasskey = async () => {
     setError('');
     setMessage('');
+    
+    const passkeyName = window.prompt("Provide a name for this passkey, to remind you which device you created it on.");
+    if (!passkeyName) return;
+
     try {
       const optionsRes = await axios.post('api/auth/fido2/register-options', { email: user?.email });
       const regResponse = await startRegistration({
@@ -67,15 +83,28 @@ const Settings: FC = () => {
       const verifyRes = await axios.post('api/auth/fido2/register-verify', {
         email: user?.email,
         body: regResponse,
+        deviceName: passkeyName,
       });
 
       if (verifyRes.data.verified) {
         setMessage('Passkey registered successfully');
+        fetchCredentials(); // Refresh list
       } else {
         setError('Passkey registration failed');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Passkey registration failed');
+    }
+  };
+
+  const handleDeletePasskey = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this passkey?')) return;
+    try {
+      await axios.delete(`api/auth/fido2/credentials/${id}`);
+      setMessage('Passkey deleted successfully');
+      fetchCredentials(); // Refresh list
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete passkey');
     }
   };
 
@@ -112,7 +141,40 @@ const Settings: FC = () => {
           <p style={{ color: 'var(--gray)', fontSize: '0.9rem', marginBottom: '1rem' }}>
             Passkeys provide a more secure, passwordless login experience.
           </p>
-          <button onClick={handleRegisterPasskey} className="secondary" style={{ width: '100%' }}>Register New Passkey</button>
+          <button onClick={handleRegisterPasskey} className="secondary" style={{ width: '100%', marginBottom: '1rem' }}>Register New Passkey</button>
+          
+          <div className="credentials-list" style={{ marginTop: '1rem' }}>
+            <h4>Registered Passkeys</h4>
+            {credentials.length === 0 ? (
+              <p style={{ fontStyle: 'italic', fontSize: '0.9rem', color: 'var(--gray)' }}>No passkeys registered yet.</p>
+            ) : (
+              credentials.map((cred) => (
+                <div key={cred.id} style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  padding: '0.75rem', 
+                  border: '1px solid var(--light-gray)',
+                  borderRadius: '4px',
+                  marginBottom: '0.5rem'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{cred.deviceName}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--gray)' }}>
+                      Added: {new Date(cred.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => handleDeletePasskey(cred.id)}
+                    className="danger" 
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {isAdmin && (

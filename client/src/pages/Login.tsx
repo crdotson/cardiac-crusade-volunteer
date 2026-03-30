@@ -8,7 +8,6 @@ const Login: FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [usePasskey, setUsePasskey] = useState(false);
   const { login, checkAuth } = useAuth();
   const navigate = useNavigate();
 
@@ -26,12 +25,13 @@ const Login: FC = () => {
   const handlePasskeyLogin = async () => {
     setError('');
     try {
-      const optionsRes = await axios.post('api/auth/fido2/login-options', { email });
+      // Trigger discoverable login immediately
+      const optionsRes = await axios.post('api/auth/fido2/login-options', { email: undefined });
       const authResponse = await startAuthentication({
         optionsJSON: optionsRes.data
       });
       const verifyRes = await axios.post('api/auth/fido2/login-verify', {
-        email,
+        email: undefined,
         body: authResponse,
       });
 
@@ -42,7 +42,8 @@ const Login: FC = () => {
         setError('Passkey verification failed');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Passkey login failed. Ensure your email is correct and you have registered a passkey.');
+      console.error('Passkey login error:', err);
+      setError('Passkey login failed. Please ensure you have a registered passkey on this device.');
     }
   };
 
@@ -52,23 +53,37 @@ const Login: FC = () => {
         <h2 style={{ textAlign: 'center', color: 'var(--primary-color)' }}>Login</h2>
         {error && <div className="error-message">{error}</div>}
 
-        {!usePasskey ? (
-          <form onSubmit={handleSubmit}>
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <button type="submit" className="primary" style={{ width: '100%', marginBottom: '1rem' }}>Login with Password</button>
-            <button type="button" className="secondary" style={{ width: '100%' }} onClick={() => setUsePasskey(true)}>Use Passkey/FIDO2</button>
-          </form>
-        ) : (
-          <div>
-            <label>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter email to find passkey" />
-            <button type="button" className="primary" style={{ width: '100%', marginBottom: '1rem' }} onClick={handlePasskeyLogin}>Login with Passkey</button>
-            <button type="button" className="secondary" style={{ width: '100%' }} onClick={() => setUsePasskey(false)}>Back to Password</button>
+        <form onSubmit={handleSubmit}>
+          <label>Email</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label>Password</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <button type="submit" className="primary" style={{ width: '100%', marginBottom: '1.5rem' }}>Login with Password</button>
+        </form>
+
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ position: 'relative', height: '1px', background: 'var(--light-gray)', margin: '1rem 0' }}>
+            <span style={{ 
+              position: 'absolute', 
+              top: '50%', 
+              left: '50%', 
+              transform: 'translate(-50%, -50%)', 
+              background: 'white', 
+              padding: '0 10px', 
+              color: 'var(--gray)',
+              fontSize: '0.8rem'
+            }}>OR</span>
           </div>
-        )}
+        </div>
+
+        <button 
+          type="button" 
+          className="secondary" 
+          style={{ width: '100%', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} 
+          onClick={handlePasskeyLogin}
+        >
+          <span>Use a Passkey / FaceID</span>
+        </button>
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
           <Link to="/forgot-password" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>Forgot Password?</Link>

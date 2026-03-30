@@ -13,6 +13,7 @@ import {
     generateAuthenticationOptions,
     verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
+import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import 'dotenv/config';
 
 const __dirname = import.meta.dirname;
@@ -226,7 +227,7 @@ mainRouter.post('/api/auth/fido2/register-options', async (req, res) => {
         const options = await generateRegistrationOptions({
             rpName: 'Cardiac Crusade',
             rpID: RP_ID,
-            userID: user ? user.id.toString() : 'new-user',
+            userID: user ? isoUint8Array.fromUTF8String(user.id.toString()) : isoUint8Array.fromUTF8String('new-user'),
             userName: email,
             attestationType: 'none',
             authenticatorSelection: {
@@ -244,7 +245,7 @@ mainRouter.post('/api/auth/fido2/register-options', async (req, res) => {
 });
 
 mainRouter.post('/api/auth/fido2/register-verify', async (req, res) => {
-    const { email, body } = req.body;
+    const { email, body, deviceName } = req.body;
     const expectedChallenge = currentChallenges.get(email);
 
     try {
@@ -257,13 +258,22 @@ mainRouter.post('/api/auth/fido2/register-verify', async (req, res) => {
 
         if (verification.verified) {
             const { registrationInfo } = verification;
-            const { credentialID, credentialPublicKey, counter } = registrationInfo;
+            const credentialID = registrationInfo?.credential?.id;
+            const credentialPublicKey = registrationInfo?.credential?.publicKey;
+            const counter = registrationInfo?.credential?.counter;
+
+            if (!credentialID || !credentialPublicKey) {
+                console.error('Missing credentialID or credentialPublicKey in registrationInfo', JSON.stringify(registrationInfo));
+                return res.status(400).json({ verified: false, message: 'Invalid registration info' });
+            }
 
             const newCredential = {
-                credentialID: Buffer.from(credentialID).toString('base64'),
+                credentialID: typeof credentialID === 'string' ? credentialID : Buffer.from(credentialID).toString('base64url'),
                 credentialPublicKey: Buffer.from(credentialPublicKey).toString('base64'),
                 counter,
-                transports: body.response.transports,
+                transports: body.response.transports || registrationInfo?.credential?.transports || [],
+                createdAt: new Date().toISOString(),
+                deviceName: deviceName || body.authenticatorAttachment || 'Unknown Device',
             };
 
             const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -289,20 +299,23 @@ mainRouter.post('/api/auth/fido2/register-verify', async (req, res) => {
 mainRouter.post('/api/auth/fido2/login-options', async (req, res) => {
     const { email } = req.body;
     try {
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-        const user = result.rows[0];
+        let user = null;
+        if (email) {
+            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+            user = result.rows[0];
+        }
 
         const options = await generateAuthenticationOptions({
             rpID: RP_ID,
             allowCredentials: user ? (user.fido2_credentials || []).map(cred => ({
-                id: Buffer.from(cred.credentialID, 'base64'),
+                id: Buffer.from(cred.credentialID, 'base64url'),
                 type: 'public-key',
                 transports: cred.transports,
             })) : [],
             userVerification: 'preferred',
         });
 
-        currentChallenges.set(email || 'any', options.challenge);
+        currentChallenges.set(email || 'discoverable', options.challenge);
         res.json(options);
     } catch (err) {
         console.error('Error in route:', req.path, err);
@@ -312,25 +325,39 @@ mainRouter.post('/api/auth/fido2/login-options', async (req, res) => {
 
 mainRouter.post('/api/auth/fido2/login-verify', async (req, res) => {
     const { email, body } = req.body;
-    const expectedChallenge = currentChallenges.get(email || 'any');
+    const expectedChallenge = currentChallenges.get(email || 'discoverable');
 
     try {
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-        const user = result.rows[0];
+        let user;
+        if (email) {
+            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+            user = result.rows[0];
+        } else {
+            // Discoverable login: search all users for this credentialID
+            const result = await pool.query("SELECT * FROM users WHERE fido2_credentials @> $1", [JSON.stringify([{ credentialID: body.id }])]);
+            user = result.rows[0];
+        }
+
         if (!user) return res.status(400).json({ verified: false, message: 'User not found' });
 
         const dbCred = (user.fido2_credentials || []).find(c => c.credentialID === body.id);
-        if (!dbCred) return res.status(400).json({ verified: false, message: 'Credential not found' });
+        if (!dbCred) {
+            console.error('Credential not found in user credentials list. body.id:', body.id);
+            return res.status(400).json({ verified: false, message: 'Credential not found' });
+        }
+
+        console.log('Found dbCred:', JSON.stringify(dbCred));
 
         const verification = await verifyAuthenticationResponse({
             response: body,
             expectedChallenge,
             expectedOrigin: ORIGIN,
             expectedRPID: RP_ID,
-            authenticator: {
-                credentialID: Buffer.from(dbCred.credentialID, 'base64'),
-                credentialPublicKey: Buffer.from(dbCred.credentialPublicKey, 'base64'),
-                counter: dbCred.counter,
+            credential: {
+                id: Buffer.from(dbCred.credentialID, 'base64url'),
+                publicKey: Buffer.from(dbCred.credentialPublicKey, 'base64'),
+                counter: dbCred.counter || 0,
+                transports: dbCred.transports || [],
             },
         });
 
@@ -347,6 +374,39 @@ mainRouter.post('/api/auth/fido2/login-verify', async (req, res) => {
         } else {
             res.status(400).json({ verified: false });
         }
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+mainRouter.get('/api/auth/fido2/credentials', authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT fido2_credentials FROM users WHERE id = $1', [req.user.id]);
+        const credentials = result.rows[0].fido2_credentials || [];
+        // Map to remove sensitive public key from the list view
+        const list = credentials.map(c => ({
+            id: c.credentialID,
+            createdAt: c.createdAt || new Date(0).toISOString(),
+            deviceName: c.deviceName || 'Unknown Device',
+            transports: c.transports || [],
+        }));
+        res.json(list);
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+mainRouter.delete('/api/auth/fido2/credentials/:id', authenticateToken, async (req, res) => {
+    const credentialId = req.params.id;
+    try {
+        const result = await pool.query('SELECT fido2_credentials FROM users WHERE id = $1', [req.user.id]);
+        const credentials = result.rows[0].fido2_credentials || [];
+        const filtered = credentials.filter(c => c.credentialID !== credentialId);
+        
+        await pool.query('UPDATE users SET fido2_credentials = $1 WHERE id = $2', [JSON.stringify(filtered), req.user.id]);
+        res.json({ success: true });
     } catch (err) {
         console.error('Error in route:', req.path, err);
         res.status(500).json({ error: err.message });
