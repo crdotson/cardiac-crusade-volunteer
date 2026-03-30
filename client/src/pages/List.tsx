@@ -9,7 +9,7 @@ const List: React.FC = () => {
 
   const fetchLocations = async () => {
     try {
-      const res = await axios.get('/api/locations');
+      const res = await axios.get('api/locations');
       setLocations(res.data);
     } catch (err) {
       console.error('Failed to fetch locations', err);

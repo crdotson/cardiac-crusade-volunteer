@@ -15,7 +15,7 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await axios.get('/api/settings');
+        const res = await axios.get('api/settings');
         setGoogleApiKey(res.data.google_api_key || '');
         setGooglePlacesLimit(res.data.google_places_limit || '10');
       } catch (err) {
@@ -30,7 +30,7 @@ const Settings: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      await axios.post('/api/settings/change-password', { currentPassword, newPassword });
+      await axios.post('api/settings/change-password', { currentPassword, newPassword });
       setMessage('Password updated successfully');
       setCurrentPassword('');
       setNewPassword('');
@@ -44,7 +44,7 @@ const Settings: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      await axios.post('/api/settings', {
+      await axios.post('api/settings', {
         settings: {
           google_api_key: googleApiKey,
           google_places_limit: googlePlacesLimit,
@@ -60,9 +60,9 @@ const Settings: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      const optionsRes = await axios.post('/api/auth/fido2/register-options', { email: user?.email });
+      const optionsRes = await axios.post('api/auth/fido2/register-options', { email: user?.email });
       const regResponse = await startRegistration(optionsRes.data);
-      const verifyRes = await axios.post('/api/auth/fido2/register-verify', {
+      const verifyRes = await axios.post('api/auth/fido2/register-verify', {
         email: user?.email,
         body: regResponse,
       });
@@ -78,12 +78,12 @@ const Settings: React.FC = () => {
   };
 
   const handleBackup = async () => {
-    const res = await axios.post('/api/admin/backup');
+    const res = await axios.post('api/admin/backup');
     alert(res.data.message);
   };
 
   const handleRestore = async () => {
-    const res = await axios.post('/api/admin/restore');
+    const res = await axios.post('api/admin/restore');
     alert(res.data.message);
   };
 

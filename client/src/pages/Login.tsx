@@ -26,9 +26,9 @@ const Login: React.FC = () => {
   const handlePasskeyLogin = async () => {
     setError('');
     try {
-      const optionsRes = await axios.post('/api/auth/fido2/login-options', { email });
+      const optionsRes = await axios.post('api/auth/fido2/login-options', { email });
       const authResponse = await startAuthentication(optionsRes.data);
-      const verifyRes = await axios.post('/api/auth/fido2/login-verify', {
+      const verifyRes = await axios.post('api/auth/fido2/login-verify', {
         email,
         body: authResponse,
       });

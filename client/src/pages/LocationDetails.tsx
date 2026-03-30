@@ -26,7 +26,7 @@ const LocationDetails: React.FC = () => {
 
   const fetchLocation = async () => {
     try {
-      const res = await axios.get(`/api/locations/${id}`);
+      const res = await axios.get(`api/locations/${id}`);
       setLocation(res.data);
       setNewStatus(res.data.status);
       setSelectedAssignee(res.data.assigned_volunteer_id || '');
@@ -40,7 +40,7 @@ const LocationDetails: React.FC = () => {
   const fetchAssignableUsers = async () => {
     if (['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(currentUser?.role || '')) {
       try {
-        const res = await axios.get('/api/users/assignable');
+        const res = await axios.get('api/users/assignable');
         setAssignableUsers(res.data);
       } catch (err) {
         console.error('Failed to fetch assignable users', err);
@@ -63,7 +63,7 @@ const LocationDetails: React.FC = () => {
 
   const updateStatus = async (status: string) => {
     try {
-      await axios.patch(`/api/locations/${id}/status`, { status });
+      await axios.patch(`api/locations/${id}/status`, { status });
       setLocation({ ...location, status });
       setNewStatus(status);
       
@@ -83,7 +83,7 @@ const LocationDetails: React.FC = () => {
 
   const handleAssign = async () => {
     try {
-      await axios.post(`/api/locations/${id}/assign`, { volunteerId: selectedAssignee });
+      await axios.post(`api/locations/${id}/assign`, { volunteerId: selectedAssignee });
       alert('Location assigned successfully');
       fetchLocation();
     } catch (err: any) {

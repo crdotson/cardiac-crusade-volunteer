@@ -123,7 +123,7 @@ const Map: React.FC = () => {
 
   const fetchLocations = async () => {
     try {
-      const res = await axios.get('/api/locations');
+      const res = await axios.get('api/locations');
       setLocations(res.data);
     } catch (err) {
       console.error('Failed to fetch locations', err);
@@ -133,7 +133,7 @@ const Map: React.FC = () => {
   const fetchVolunteers = async () => {
     if (['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '')) {
       try {
-        const res = await axios.get('/api/users');
+        const res = await axios.get('api/users');
         const data = res.data;
         setVolunteers(data.filter((u: any) => u.role === 'Volunteer' || u.role === 'CHAARG leader'));
       } catch (err) {
@@ -144,7 +144,7 @@ const Map: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get('/api/categories');
+      const res = await axios.get('api/categories');
       setCategories(res.data);
       if (res.data.length > 0) setSelectedCategory(res.data[0]);
     } catch (err) {
@@ -160,7 +160,7 @@ const Map: React.FC = () => {
 
   useEffect(() => {
     if (selectedVolunteer) {
-      axios.get(`/api/assignments/${selectedVolunteer}`).then(res => {
+      axios.get(`api/assignments/${selectedVolunteer}`).then(res => {
         setUserAssignments(res.data);
       }).catch(err => {
         console.error('Failed to fetch user assignments', err);
@@ -177,14 +177,14 @@ const Map: React.FC = () => {
     }
 
     try {
-      const res = await axios.post('/api/assignments/area', {
+      const res = await axios.post('api/assignments/area', {
         volunteerId: selectedVolunteer,
         bounds: bounds
       });
       alert(`Assigned ${res.data.assignedCount} locations.`);
       fetchLocations();
       // Refetch assignments for the current volunteer to show the new rectangle
-      const assignRes = await axios.get(`/api/assignments/${selectedVolunteer}`);
+      const assignRes = await axios.get(`api/assignments/${selectedVolunteer}`);
       setUserAssignments(assignRes.data);
     } catch (err) {
       console.error('Failed to assign locations', err);
@@ -197,7 +197,7 @@ const Map: React.FC = () => {
     setCandidates([]);
     setSelectedCandidates(new Set());
     try {
-      const res = await axios.post('/api/locations/search', {
+      const res = await axios.post('api/locations/search', {
         category: selectedCategory,
         city: importCity
       });
@@ -219,7 +219,7 @@ const Map: React.FC = () => {
 
     setIsImporting(true);
     try {
-      const res = await axios.post('/api/locations/confirm-import', {
+      const res = await axios.post('api/locations/confirm-import', {
         locations: locationsToImport
       });
       alert(`Imported ${res.data.importedCount} locations.`);

@@ -21,7 +21,7 @@ const Users: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('/api/users');
+      const res = await axios.get('api/users');
       setUsers(res.data);
     } catch (err: any) {
       setError('Failed to fetch users');
@@ -37,7 +37,7 @@ const Users: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      await axios.post('/api/users', { email, password, role });
+      await axios.post('api/users', { email, password, role });
       setMessage('User created successfully');
       setEmail('');
       setPassword('');

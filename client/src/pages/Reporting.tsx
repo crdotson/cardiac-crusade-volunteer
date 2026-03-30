@@ -9,7 +9,7 @@ const Reporting: React.FC = () => {
 
   const fetchMetrics = async () => {
     try {
-      const res = await axios.get('/api/reporting/metrics');
+      const res = await axios.get('api/reporting/metrics');
       setMetrics(res.data);
     } catch (err) {
       console.error('Failed to fetch metrics', err);

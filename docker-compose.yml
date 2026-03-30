@@ -1,18 +1,20 @@
-version: '3.8'
 services:
   app:
     build: .
     ports:
-      - "1443:3000"
+      - "0.0.0.0:1443:3000"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=cardiac_crusade
       - POSTGRES_HOST=db
+      - ORIGIN=https://www.dotson97.org
     depends_on:
       - db
+    restart: unless-stopped
   db:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres

@@ -16,7 +16,7 @@ const ForgotPassword: React.FC = () => {
     e.preventDefault();
     setError('');
     try {
-      const res = await axios.post('/api/auth/forgot-password', { email });
+      const res = await axios.post('api/auth/forgot-password', { email });
       if (res.data.isSocial) {
         setMessage(res.data.message);
       } else {
@@ -32,7 +32,7 @@ const ForgotPassword: React.FC = () => {
     e.preventDefault();
     setError('');
     try {
-      const res = await axios.post('/api/auth/verify-otp', { email, otp });
+      const res = await axios.post('api/auth/verify-otp', { email, otp });
       setResetToken(res.data.resetToken);
       setStep(3);
     } catch (err: any) {
@@ -44,7 +44,7 @@ const ForgotPassword: React.FC = () => {
     e.preventDefault();
     setError('');
     try {
-      await axios.post('/api/auth/reset-password', { token: resetToken, newPassword });
+      await axios.post('api/auth/reset-password', { token: resetToken, newPassword });
       setMessage('Password reset successful. You can now login.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err: any) {

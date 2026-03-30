@@ -21,20 +21,25 @@ const { isoUint8Array } = require('@simplewebauthn/server/helpers');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1); // Trust the reverse proxy
 app.use(cors({
-    origin: ['http://localhost:1443', 'http://127.0.0.1:1443'],
+    origin: ['https://www.dotson97.org', 'http://localhost:1443'],
     credentials: true,
 }));
 app.use(express.json());
 app.use(cookieParser());
 
-// Global request logger
-app.use((req, res, next) => {
+const BASE_PATH = process.env.BASE_PATH || '/cardiac-crusade';
+const mainRouter = express.Router();
+
+// Global request logger (within router)
+mainRouter.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
     next();
 });
 
 const pool = new Pool({
+// ... (rest of the file uses mainRouter instead of app) ...
   user: process.env.POSTGRES_USER || 'postgres',
   host: process.env.POSTGRES_HOST || 'db',
   database: process.env.POSTGRES_DB || 'cardiac_crusade',
@@ -43,8 +48,8 @@ const pool = new Pool({
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
-const RP_ID = process.env.RP_ID || 'localhost';
-const ORIGIN = `http://${RP_ID}:1443`;
+const RP_ID = process.env.RP_ID || 'www.dotson97.org';
+const ORIGIN = process.env.ORIGIN || `https://${RP_ID}`;
 
 async function initDB() {
   let retries = 5;
@@ -179,7 +184,7 @@ const currentChallenges = new Map();
 
 // --- Auth Endpoints ---
 
-app.post('/api/login', async (req, res) => {
+mainRouter.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -205,18 +210,18 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.post('/api/logout', (req, res) => {
+mainRouter.post('/api/logout', (req, res) => {
     res.clearCookie('token');
     res.json({ success: true });
 });
 
-app.get('/api/me', authenticateToken, (req, res) => {
+mainRouter.get('/api/me', authenticateToken, (req, res) => {
     res.json({ user: req.user });
 });
 
 // --- FIDO2 (WebAuthn) ---
 
-app.post('/api/auth/fido2/register-options', async (req, res) => {
+mainRouter.post('/api/auth/fido2/register-options', async (req, res) => {
     const { email } = req.body;
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -242,7 +247,7 @@ app.post('/api/auth/fido2/register-options', async (req, res) => {
     }
 });
 
-app.post('/api/auth/fido2/register-verify', async (req, res) => {
+mainRouter.post('/api/auth/fido2/register-verify', async (req, res) => {
     const { email, body } = req.body;
     const expectedChallenge = currentChallenges.get(email);
 
@@ -285,7 +290,7 @@ app.post('/api/auth/fido2/register-verify', async (req, res) => {
     }
 });
 
-app.post('/api/auth/fido2/login-options', async (req, res) => {
+mainRouter.post('/api/auth/fido2/login-options', async (req, res) => {
     const { email } = req.body;
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -309,7 +314,7 @@ app.post('/api/auth/fido2/login-options', async (req, res) => {
     }
 });
 
-app.post('/api/auth/fido2/login-verify', async (req, res) => {
+mainRouter.post('/api/auth/fido2/login-verify', async (req, res) => {
     const { email, body } = req.body;
     const expectedChallenge = currentChallenges.get(email || 'any');
 
@@ -354,7 +359,7 @@ app.post('/api/auth/fido2/login-verify', async (req, res) => {
 
 // --- OTP Logic ---
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+mainRouter.post('/api/auth/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
         const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -399,7 +404,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     }
 });
 
-app.post('/api/auth/verify-otp', async (req, res) => {
+mainRouter.post('/api/auth/verify-otp', async (req, res) => {
     const { email, otp } = req.body;
     try {
         const otpRes = await pool.query('SELECT * FROM otp_storage WHERE email = $1', [email]);
@@ -438,7 +443,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
     }
 });
 
-app.post('/api/auth/reset-password', async (req, res) => {
+mainRouter.post('/api/auth/reset-password', async (req, res) => {
     const { token, newPassword } = req.body;
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -453,12 +458,12 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 // --- Social Login Stubs ---
-app.get('/api/auth/google', (req, res) => res.status(501).json({ message: 'Google Login stub' }));
-app.get('/api/auth/facebook', (req, res) => res.status(501).json({ message: 'Facebook Login stub' }));
+mainRouter.get('/api/auth/google', (req, res) => res.status(501).json({ message: 'Google Login stub' }));
+mainRouter.get('/api/auth/facebook', (req, res) => res.status(501).json({ message: 'Facebook Login stub' }));
 
 // --- Users Management (Phase 2) ---
 
-app.get('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
     try {
         const { role, id } = req.user;
         let query = '';
@@ -498,7 +503,7 @@ app.get('/api/users', authenticateToken, authorizeRoles('Application Administrat
     }
 });
 
-app.post('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.post('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
     const { email, password, role } = req.body;
     const creatorRole = req.user.role;
     const creatorId = req.user.id;
@@ -526,7 +531,7 @@ app.post('/api/users', authenticateToken, authorizeRoles('Application Administra
 
 // --- Settings Management ---
 
-app.get('/api/settings', authenticateToken, async (req, res) => {
+mainRouter.get('/api/settings', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM settings');
         const settings = {};
@@ -540,7 +545,7 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/settings', authenticateToken, authorizeRoles('Application Administrator'), async (req, res) => {
+mainRouter.post('/api/settings', authenticateToken, authorizeRoles('Application Administrator'), async (req, res) => {
     const { settings } = req.body; // { key1: value1, key2: value2 }
     try {
         for (const [key, value] of Object.entries(settings)) {
@@ -553,7 +558,7 @@ app.post('/api/settings', authenticateToken, authorizeRoles('Application Adminis
     }
 });
 
-app.post('/api/settings/change-password', authenticateToken, async (req, res) => {
+mainRouter.post('/api/settings/change-password', authenticateToken, async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     try {
         const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
@@ -578,7 +583,7 @@ app.post('/api/settings/change-password', authenticateToken, async (req, res) =>
 const stringSimilarity = require('string-similarity');
 const axios = require('axios');
 
-app.get('/api/categories', (req, res) => {
+mainRouter.get('/api/categories', (req, res) => {
     const categories = [
         "Airports", "Amusement Park", "Aquarium", "Apartment Complex", "Auditoriums", "Arena", "Bank", "Bar", 
         "Businesses", "Cafeterias", "Camping Site", "Casino", "Church", "Clinic", "College", "Community Center", 
@@ -593,7 +598,7 @@ app.get('/api/categories', (req, res) => {
     res.json(categories);
 });
 
-app.get('/api/locations', authenticateToken, async (req, res) => {
+mainRouter.get('/api/locations', authenticateToken, async (req, res) => {
     const { role, id } = req.user;
     try {
         let query = 'SELECT l.*, u.email as assigned_volunteer_email FROM locations l LEFT JOIN users u ON l.assigned_volunteer_id = u.id';
@@ -623,7 +628,7 @@ app.get('/api/locations', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/locations/:id', authenticateToken, async (req, res) => {
+mainRouter.get('/api/locations/:id', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT l.*, v.email as volunteer_email, b.email as assigned_by_email 
@@ -640,7 +645,7 @@ app.get('/api/locations/:id', authenticateToken, async (req, res) => {
     }
 });
 
-app.patch('/api/locations/:id/status', authenticateToken, async (req, res) => {
+mainRouter.patch('/api/locations/:id/status', authenticateToken, async (req, res) => {
     const { status } = req.body;
     const locationId = req.params.id;
     const userId = req.user.id;
@@ -661,7 +666,7 @@ app.patch('/api/locations/:id/status', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/locations/search', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { category, city = 'Lexington, KY' } = req.body;
     try {
         const keyRes = await pool.query("SELECT value FROM settings WHERE key = 'google_api_key'");
@@ -717,7 +722,7 @@ app.post('/api/locations/search', authenticateToken, authorizeRoles('Application
     }
 });
 
-app.post('/api/locations/confirm-import', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+mainRouter.post('/api/locations/confirm-import', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { locations } = req.body;
     try {
         // Fetch all current area assignments
@@ -753,7 +758,7 @@ app.post('/api/locations/confirm-import', authenticateToken, authorizeRoles('App
     }
 });
 
-app.post('/api/assignments/area', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.post('/api/assignments/area', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
     const { volunteerId, bounds } = req.body; // bounds: { _northEast: {lat, lng}, _southWest: {lat, lng} }
     const assignedBy = req.user.id;
 
@@ -779,7 +784,7 @@ app.post('/api/assignments/area', authenticateToken, authorizeRoles('Application
     }
 });
 
-app.get('/api/users/assignable', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.get('/api/users/assignable', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
     try {
         const { role, id } = req.user;
         let query = '';
@@ -810,7 +815,7 @@ app.get('/api/users/assignable', authenticateToken, authorizeRoles('Application 
     }
 });
 
-app.post('/api/locations/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.post('/api/locations/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
     const { volunteerId } = req.body;
     const locationId = req.params.id;
     const creatorId = req.user.id;
@@ -848,7 +853,7 @@ app.post('/api/locations/:id/assign', authenticateToken, authorizeRoles('Applica
     }
 });
 
-app.get('/api/assignments/:userId', authenticateToken, async (req, res) => {
+mainRouter.get('/api/assignments/:userId', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM assignments WHERE user_id = $1', [req.params.userId]);
         res.json(result.rows);
@@ -860,7 +865,7 @@ app.get('/api/assignments/:userId', authenticateToken, async (req, res) => {
 
 // --- Reporting (Phase 5) ---
 
-app.get('/api/reporting/metrics', authenticateToken, async (req, res) => {
+mainRouter.get('/api/reporting/metrics', authenticateToken, async (req, res) => {
     const { role, id } = req.user;
     try {
         let userScopeQuery = '';
@@ -920,19 +925,24 @@ app.get('/api/reporting/metrics', authenticateToken, async (req, res) => {
 });
 
 // --- Backup/Restore Stubs ---
-app.post('/api/admin/backup', authenticateToken, authorizeRoles('Application Administrator'), (req, res) => {
+mainRouter.post('/api/admin/backup', authenticateToken, authorizeRoles('Application Administrator'), (req, res) => {
     res.json({ message: 'Backup initiated. (Stub)' });
 });
 
-app.post('/api/admin/restore', authenticateToken, authorizeRoles('Application Administrator'), (req, res) => {
+mainRouter.post('/api/admin/restore', authenticateToken, authorizeRoles('Application Administrator'), (req, res) => {
     res.json({ message: 'Restore initiated. (Stub)' });
 });
 
 // Serve frontend static files
-app.use(express.static(path.join(__dirname, '../client/dist')));
-app.use((req, res) => {
+mainRouter.use(express.static(path.join(__dirname, '../client/dist')));
+mainRouter.use((req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
+
+app.use(BASE_PATH, mainRouter);
+
+// For development/direct access support, also mount on root or redirect
+app.get('/', (req, res) => res.redirect(BASE_PATH));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -36,7 +36,7 @@ const Dashboard: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/cardiac-crusade">
         <div className="App">
           <Navbar />
           <Routes>

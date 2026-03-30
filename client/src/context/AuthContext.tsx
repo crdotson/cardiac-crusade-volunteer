@@ -19,7 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Set axios defaults
 axios.defaults.withCredentials = true;
-// baseURL is removed to allow relative calls
+axios.defaults.baseURL = '/cardiac-crusade/';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuth = async () => {
     try {
-      const res = await axios.get('/api/me');
+      const res = await axios.get('api/me');
       setUser(res.data.user);
     } catch (err) {
       setUser(null);
@@ -41,14 +41,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await axios.post('/api/login', { email, password });
+    const res = await axios.post('api/login', { email, password });
     if (res.data.success) {
       setUser(res.data.user);
     }
   };
 
   const logout = async () => {
-    await axios.post('/api/logout');
+    await axios.post('api/logout');
     setUser(null);
   };
 
