@@ -1,17 +1,17 @@
-FROM node:18 AS frontend-builder
+FROM node:24 AS frontend-builder
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm install
 COPY client/ ./
 RUN npm run build
 
-FROM node:18 AS backend-builder
+FROM node:24 AS backend-builder
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm install
 COPY server/ ./
 
-FROM node:18-slim
+FROM node:24-slim
 WORKDIR /app
 COPY --from=frontend-builder /app/client/dist ./client/dist
 COPY --from=backend-builder /app/server ./server

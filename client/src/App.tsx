@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
@@ -10,9 +9,10 @@ import Map from './pages/Map';
 import List from './pages/List';
 import LocationDetails from './pages/LocationDetails';
 import Reporting from './pages/Reporting';
+import { type FC, type ReactNode } from 'react';
 import './index.css';
 
-const PrivateRoute: React.FC<{ children: React.ReactNode; roles?: string[] }> = ({ children, roles }) => {
+const PrivateRoute: FC<{ children: ReactNode; roles?: string[] }> = ({ children, roles }) => {
   const { user, loading } = useAuth();
 
   if (loading) return <div>Loading...</div>;
@@ -22,7 +22,7 @@ const PrivateRoute: React.FC<{ children: React.ReactNode; roles?: string[] }> = 
   return <>{children}</>;
 };
 
-const Dashboard: React.FC = () => {
+const Dashboard: FC = () => {
   return (
     <div className="container">
       <div className="card">

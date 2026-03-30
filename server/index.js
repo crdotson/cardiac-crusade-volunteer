@@ -1,24 +1,21 @@
-const express = require('express');
-const { Pool } = require('pg');
-const bcrypt = require('bcrypt');
-const cors = require('cors');
-const path = require('path');
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-const nodemailer = require('nodemailer');
-const crypto = require('node:crypto');
-if (!global.crypto) {
-    global.crypto = crypto;
-}
-const {
+import express from 'express';
+import pg from 'pg';
+const { Pool } = pg;
+import bcrypt from 'bcrypt';
+import cors from 'cors';
+import path from 'path';
+import jwt from 'jsonwebtoken';
+import cookieParser from 'cookie-parser';
+import nodemailer from 'nodemailer';
+import {
     generateRegistrationOptions,
     verifyRegistrationResponse,
     generateAuthenticationOptions,
     verifyAuthenticationResponse,
-} = require('@simplewebauthn/server');
-const { isoUint8Array } = require('@simplewebauthn/server/helpers');
+} from '@simplewebauthn/server';
+import 'dotenv/config';
 
-require('dotenv').config();
+const __dirname = import.meta.dirname;
 
 const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy
@@ -39,7 +36,6 @@ mainRouter.use((req, res, next) => {
 });
 
 const pool = new Pool({
-// ... (rest of the file uses mainRouter instead of app) ...
   user: process.env.POSTGRES_USER || 'postgres',
   host: process.env.POSTGRES_HOST || 'db',
   database: process.env.POSTGRES_DB || 'cardiac_crusade',
@@ -580,8 +576,8 @@ mainRouter.post('/api/settings/change-password', authenticateToken, async (req, 
 
 // --- Locations & Assignments (Phases 3 & 4) ---
 
-const stringSimilarity = require('string-similarity');
-const axios = require('axios');
+import stringSimilarity from 'string-similarity';
+import axios from 'axios';
 
 mainRouter.get('/api/categories', (req, res) => {
     const categories = [
