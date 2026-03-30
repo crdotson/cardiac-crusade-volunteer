@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, type FC, type FormEvent } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { startRegistration } from '@simplewebauthn/browser';
 
-const Settings: React.FC = () => {
+const Settings: FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [googleApiKey, setGoogleApiKey] = useState('');
@@ -25,7 +25,7 @@ const Settings: React.FC = () => {
     fetchSettings();
   }, []);
 
-  const handleChangePassword = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
@@ -39,7 +39,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleSaveAdminSettings = async (e: React.FormEvent) => {
+  const handleSaveAdminSettings = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
@@ -61,7 +61,9 @@ const Settings: React.FC = () => {
     setMessage('');
     try {
       const optionsRes = await axios.post('api/auth/fido2/register-options', { email: user?.email });
-      const regResponse = await startRegistration(optionsRes.data);
+      const regResponse = await startRegistration({
+        optionsJSON: optionsRes.data
+      });
       const verifyRes = await axios.post('api/auth/fido2/register-verify', {
         email: user?.email,
         body: regResponse,
@@ -107,15 +109,10 @@ const Settings: React.FC = () => {
           </form>
           <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />
           <h3>Passkeys / FIDO2</h3>
+          <p style={{ color: 'var(--gray)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            Passkeys provide a more secure, passwordless login experience.
+          </p>
           <button onClick={handleRegisterPasskey} className="secondary" style={{ width: '100%' }}>Register New Passkey</button>
-          
-          <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />
-          <h3>Social Logins</h3>
-          <p style={{ color: 'var(--gray)', fontSize: '0.9rem' }}>Link your account to social providers (Stubs)</p>
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <button onClick={() => alert('Link Google Stub')} style={{ background: '#4285F4', color: 'white' }}>Link Google</button>
-            <button onClick={() => alert('Link Facebook Stub')} style={{ background: '#3b5998', color: 'white' }}>Link Facebook</button>
-          </div>
         </div>
 
         {isAdmin && (
