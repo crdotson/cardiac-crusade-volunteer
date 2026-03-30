@@ -15,7 +15,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build image
         run: docker build -t localhost:5000/cardiac-crusade-volunteer:${{ github.sha }} .
