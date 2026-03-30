@@ -20,32 +20,38 @@ const Navbar: React.FC = () => {
 
   return (
     <nav className="nav-bar">
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, color: 'var(--primary-color)', marginRight: '2rem' }}>Cardiac Crusade</h2>
-        <ul className="nav-links">
-          {canViewUsers && (
-            <li>
-              <Link to="/users" className={isActive('/users')}>Users</Link>
-            </li>
-          )}
-          <li>
-            <Link to="/map" className={isActive('/map')}>Map</Link>
-          </li>
-          <li>
-            <Link to="/list" className={isActive('/list')}>List</Link>
-          </li>
-          <li>
-            <Link to="/reporting" className={isActive('/reporting')}>Reporting</Link>
-          </li>
-        </ul>
+      <div className="nav-brand">
+        <h2 className="brand-title">Cardiac Crusade</h2>
       </div>
-      <div className="nav-links">
-        <span>{user.email} ({user.role})</span>
-        <Link to="/settings" title="Settings">
+      
+      <div className="nav-user-controls">
+        <span className="user-email">{user.email}</span>
+        <span className="user-role">({user.role})</span>
+        <Link to="/settings" title="Settings" className="settings-link">
           <span style={{ fontSize: '1.2rem' }}>⚙️</span>
         </Link>
-        <button onClick={handleLogout} className="secondary" style={{ padding: '0.25rem 0.5rem' }}>Logout</button>
+        <button onClick={handleLogout} className="secondary logout-button" title="Logout">
+          <span className="logout-text">Logout</span>
+          <span className="logout-icon" style={{ display: 'none' }}>⏻</span>
+        </button>
       </div>
+
+      <ul className="nav-links">
+        {canViewUsers && (
+          <li>
+            <Link to="/users" className={isActive('/users')}>Users</Link>
+          </li>
+        )}
+        <li>
+          <Link to="/map" className={isActive('/map')}>Map</Link>
+        </li>
+        <li>
+          <Link to="/list" className={isActive('/list')}>List</Link>
+        </li>
+        <li>
+          <Link to="/reporting" className={isActive('/reporting')}>Reporting</Link>
+        </li>
+      </ul>
     </nav>
   );
 };
