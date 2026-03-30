@@ -82,11 +82,23 @@ input, select {
   border-bottom: 2px solid var(--primary-color);
   padding: 1rem 2rem;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   position: sticky;
   top: 0;
   z-index: 100;
+}
+
+.brand-title {
+  margin: 0;
+  color: var(--primary-color);
+}
+
+.nav-user-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .nav-links {
@@ -184,4 +196,64 @@ th {
   margin-bottom: 0.5rem;
   font-weight: 600;
   font-family: 'Montserrat', sans-serif;
+}
+
+@media (max-width: 768px) {
+  .nav-bar {
+    padding: 0.75rem 1rem;
+  }
+
+  .nav-brand {
+    flex: 1;
+    text-align: left;
+  }
+
+  .brand-title {
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+
+  .nav-user-controls {
+    flex: 1;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .user-email {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+
+  .user-role {
+    display: none;
+  }
+
+  .logout-text {
+    display: none;
+  }
+
+  .logout-icon {
+    display: inline !important;
+    font-size: 1.1rem;
+  }
+
+  .logout-button {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .nav-links {
+    width: 100%;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--light-gray);
+    justify-content: space-around;
+    gap: 0.5rem;
+  }
+
+  .nav-links a {
+    font-size: 0.9rem;
+  }
 }
