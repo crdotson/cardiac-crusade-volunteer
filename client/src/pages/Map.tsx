@@ -344,8 +344,23 @@ const Map: React.FC = () => {
   };
 
   const handleManualSubmit = async () => {
+    let dataToSave = { ...manualData };
+    
+    // Default coordinates check (using 38.0406 as 'missing' indicator)
+    if (dataToSave.lat === 38.0406) {
+      try {
+        const res = await axios.post('api/locations/geocode', { address: dataToSave.address });
+        dataToSave.lat = res.data.lat;
+        dataToSave.lng = res.data.lng;
+        dataToSave.address = res.data.formatted_address;
+      } catch (err: any) {
+        alert('Could not find location for this address. Please be more specific or select an option from the list.');
+        return;
+      }
+    }
+
     try {
-      await axios.post('api/locations', manualData);
+      await axios.post('api/locations', dataToSave);
       setShowManualAdd(false);
       setManualData({
         name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', lat: 38.0406, lng: -84.5037
