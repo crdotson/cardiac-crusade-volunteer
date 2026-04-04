@@ -59,12 +59,21 @@ const CustomMarkerIcon = (color: string, isTarget: boolean) => {
   });
 };
 
-const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer }: { 
+const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTool, onToolEnabled }: { 
   onDrawCreated: (bounds: L.LatLngBounds) => void, 
   onCircleCreated: (center: L.LatLng, radius: number) => void,
-  selectedVolunteer: string 
+  selectedVolunteer: string,
+  activeTool: string | null,
+  onToolEnabled: (tool: string | null) => void
 }) => {
   const map = useMap();
+
+  useEffect(() => {
+    if (activeTool === 'Circle') {
+      map.pm.enableDraw('Circle');
+      onToolEnabled(null);
+    }
+  }, [activeTool, map, onToolEnabled]);
 
   useEffect(() => {
     map.pm.addControls({
@@ -127,9 +136,15 @@ const Map: React.FC = () => {
   
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<number>>(new Set());
+  const [activeTool, setActiveTool] = useState<string | null>(null);
   
   const [filterText, setFilterText] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('All');
+
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [manualData, setManualData] = useState<any>({
+    name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', lat: 38.0406, lng: -84.5037
+  });
 
   const fetchLocations = async () => {
     try {
@@ -273,6 +288,26 @@ const Map: React.FC = () => {
     setSelectedCandidates(new Set());
   };
 
+  const handleManualSubmit = async () => {
+    try {
+      await axios.post('api/locations', manualData);
+      setShowManualAdd(false);
+      setManualData({
+        name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', lat: 38.0406, lng: -84.5037
+      });
+      fetchLocations();
+    } catch (err) {
+      alert('Failed to add location');
+    }
+  };
+
+  const useMyLocation = () => {
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      setManualData({ ...manualData, lat: latitude, lng: longitude });
+    });
+  };
+
   const filteredCandidates = candidates
     .map((c, originalIndex) => ({ ...c, originalIndex }))
     .filter(c => {
@@ -286,22 +321,28 @@ const Map: React.FC = () => {
   return (
     <div className="container" style={{ maxWidth: '100%', padding: '1rem' }}>
       <div className="card" style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-          <h2>Map View</h2>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div className="button-group">
             {['Application Administrator', 'City Coordinator'].includes(user?.role || '') && (
-              <button onClick={() => setShowImport(true)}>Import Locations</button>
+              <>
+                <button onClick={() => setShowImport(true)}>Import by Category</button>
+                <button onClick={() => setActiveTool('Circle')}>Import by Area</button>
+                <button onClick={() => setShowManualAdd(true)}>Manually Add</button>
+              </>
             )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             {['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '') && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <label>Assign to:</label>
-                <select value={selectedVolunteer} onChange={(e) => setSelectedVolunteer(e.target.value)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid #ddd', paddingLeft: '1rem' }}>
+                <label style={{ whiteSpace: 'nowrap' }}>Assign to:</label>
+                <select value={selectedVolunteer} onChange={(e) => setSelectedVolunteer(e.target.value)} style={{ marginBottom: 0 }}>
                   <option value="">Select Volunteer</option>
                   {volunteers.map(v => (
                     <option key={v.id} value={v.id}>{v.email} ({v.role})</option>
                   ))}
                 </select>
-                <span style={{ fontSize: '0.8rem', color: '#666' }}>Draw rectangle to assign</span>
+                <span style={{ fontSize: '0.8rem', color: '#666', whiteSpace: 'nowrap' }}>Draw rectangle to assign</span>
               </div>
             )}
           </div>
@@ -345,6 +386,8 @@ const Map: React.FC = () => {
             onDrawCreated={handleAreaAssignment} 
             onCircleCreated={handleCircleCreated}
             selectedVolunteer={selectedVolunteer} 
+            activeTool={activeTool}
+            onToolEnabled={setActiveTool}
           />
         </MapContainer>
       </div>
@@ -421,6 +464,75 @@ const Map: React.FC = () => {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showManualAdd && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '500px' }}>
+            <h3>Manually Add Location</h3>
+            <div className="form-group">
+              <label>Name *</label>
+              <input 
+                type="text" 
+                value={manualData.name} 
+                onChange={e => setManualData({ ...manualData, name: e.target.value })} 
+                placeholder="Business Name"
+              />
+            </div>
+            <div className="form-group">
+              <label>Address *</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  value={manualData.address} 
+                  onChange={e => setManualData({ ...manualData, address: e.target.value })} 
+                  placeholder="Street, City, State, Zip"
+                />
+                <button onClick={useMyLocation} title="Use My Location" style={{ padding: '0.5rem' }}>📍</button>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Phone</label>
+              <input 
+                type="text" 
+                value={manualData.phone} 
+                onChange={e => setManualData({ ...manualData, phone: e.target.value })} 
+              />
+            </div>
+            <div className="form-group">
+              <label>Category</label>
+              <select value={manualData.category} onChange={e => setManualData({ ...manualData, category: e.target.value })}>
+                <option value="">Select Category</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select value={manualData.status} onChange={e => setManualData({ ...manualData, status: e.target.value })}>
+                <option value="Unvisited">Unvisited</option>
+                <option value="Pending">Pending</option>
+                <option value="AED Located and Mapped at AED.new - Done">AED Located and Mapped at AED.new - Done</option>
+                <option value="Follow-up Required">Follow-up Required</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Assign to</label>
+              <select 
+                value={manualData.assigned_volunteer_id} 
+                onChange={e => setManualData({ ...manualData, assigned_volunteer_id: e.target.value })}
+              >
+                <option value="">Unassigned</option>
+                {volunteers.map(v => (
+                  <option key={v.id} value={v.id}>{v.email}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button onClick={handleManualSubmit} disabled={!manualData.name || !manualData.address}>Add Location</button>
+              <button className="secondary" onClick={() => setShowManualAdd(false)}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

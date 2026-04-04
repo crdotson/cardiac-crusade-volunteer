@@ -282,3 +282,24 @@ th {
   font-size: 0.9rem;
   white-space: nowrap;
 }
+
+.button-group {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.button-group button {
+  border-radius: 0;
+  border: 1px solid var(--primary-color);
+  background: white;
+  color: var(--primary-color);
+  margin-bottom: 0;
+}
+.button-group button:not(:last-child) {
+  border-right: none;
+}
+.button-group button:hover {
+  background: var(--primary-color);
+  color: white;
+  opacity: 1;
+}
