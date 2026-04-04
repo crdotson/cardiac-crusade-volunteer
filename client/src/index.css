@@ -325,3 +325,7 @@ th {
   color: white;
   opacity: 1;
 }
+
+.pac-container {
+  z-index: 10000 !important; /* Ensure it stays above modals */
+}

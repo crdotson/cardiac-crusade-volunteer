@@ -157,27 +157,47 @@ const Map: React.FC = () => {
   });
 
   useEffect(() => {
-    if (showManualAdd && (window as any).google) {
-      const google = (window as any).google;
-      const input = document.getElementById('address') as HTMLInputElement;
-      if (!input) return;
-      
-      const autocomplete = new google.maps.places.Autocomplete(input, {
-        types: ['address'],
-        fields: ['formatted_address', 'geometry']
-      });
-      
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry && place.geometry.location) {
-          setManualData((prev: any) => ({
-            ...prev,
-            address: place.formatted_address || '',
-            lat: place.geometry!.location!.lat(),
-            lng: place.geometry!.location!.lng()
-          }));
+    if (showManualAdd) {
+      const initAutocomplete = () => {
+        if (!(window as any).google) {
+          setTimeout(initAutocomplete, 100);
+          return;
         }
-      });
+        const google = (window as any).google;
+        const input = document.getElementById('address') as HTMLInputElement;
+        if (!input) return;
+        
+        const autocomplete = new google.maps.places.Autocomplete(input, {
+          types: ['address'],
+          fields: ['formatted_address', 'geometry']
+        });
+        
+        // Fetch default_origin_city from settings to bias results
+        axios.get('api/settings').then(res => {
+          const city = res.data.default_origin_city;
+          if (city) {
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ address: city }, (results: any, status: any) => {
+              if (status === 'OK' && results![0].geometry.viewport) {
+                autocomplete.setBounds(results![0].geometry.viewport);
+              }
+            });
+          }
+        });
+
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          if (place.geometry && place.geometry.location) {
+            setManualData((prev: any) => ({
+              ...prev,
+              address: place.formatted_address || '',
+              lat: place.geometry!.location!.lat(),
+              lng: place.geometry!.location!.lng()
+            }));
+          }
+        });
+      };
+      initAutocomplete();
     }
   }, [showManualAdd]);
 
