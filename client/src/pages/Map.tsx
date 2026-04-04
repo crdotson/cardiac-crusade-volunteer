@@ -7,6 +7,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import confetti from 'canvas-confetti';
 
 // Fix Leaflet marker icon issue
 // @ts-ignore
@@ -316,6 +317,40 @@ const Map: React.FC = () => {
     });
   };
 
+  const statuses = [
+    'Unvisited',
+    'Pending',
+    'AED Located and Mapped at AED.new - Done',
+    'Follow-up Required'
+  ];
+
+  const handleUpdateStatus = async (id: number, status: string) => {
+    try {
+      await axios.patch(`api/locations/${id}/status`, { status });
+      if (status.includes('Done')) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+      fetchLocations();
+    } catch (err) {
+      console.error('Failed to update status', err);
+    }
+  };
+
+  const handleAssign = async (id: number, volunteerId: string) => {
+    try {
+      await axios.post(`api/locations/${id}/assign`, { volunteerId: volunteerId || null });
+      fetchLocations();
+    } catch (err) {
+      console.error('Failed to assign location', err);
+    }
+  };
+
+  const canAssign = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
+
   const filteredCandidates = candidates
     .map((c, originalIndex) => ({ ...c, originalIndex }))
     .filter(c => {
@@ -387,13 +422,64 @@ const Map: React.FC = () => {
                 icon={CustomMarkerIcon(getStatusColor(loc.status, !!loc.assigned_volunteer_id), !!isAssignedToSelected)}
               >
                 <Popup>
-                  <strong>{loc.name}</strong><br />
-                  {loc.address}<br />
-                  Status: {loc.status}<br />
-                  Assigned: {loc.assigned_volunteer_email || 'Unassigned'}<br />
-                  <button onClick={() => navigate(`/locations/${loc.id}`)} style={{ padding: '2px 5px', fontSize: '0.8rem', marginTop: '5px' }}>
-                    Details
-                  </button>
+                  <div className="popup-content" style={{ minWidth: '200px' }}>
+                    <h3 style={{ margin: '0 0 5px 0', fontSize: '1rem' }}>{loc.name}</h3>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem' }}>{loc.address}</p>
+                    <div style={{ display: 'flex', gap: '5px', fontSize: '0.75rem', marginBottom: '10px', flexWrap: 'wrap' }}>
+                      <span className="badge" style={{ backgroundColor: '#666' }}>{formatCategoryName(loc.category)}</span>
+                      {loc.assigned_volunteer_email && (
+                        <span className="badge" style={{ backgroundColor: '#3498db' }}>{loc.assigned_volunteer_email}</span>
+                      )}
+                    </div>
+                    
+                    <div className="form-group" style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Status</label>
+                      <select 
+                        key={`${loc.id}-${loc.status}`}
+                        defaultValue={loc.status} 
+                        onChange={(e) => handleUpdateStatus(loc.id, e.target.value)}
+                        style={{ fontSize: '0.85rem', padding: '4px', marginBottom: 0 }}
+                      >
+                        {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+
+                    {canAssign && (
+                      <div className="form-group" style={{ marginBottom: '10px' }}>
+                        <label style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Assign To</label>
+                        <select 
+                          key={`${loc.id}-${loc.assigned_volunteer_id}`}
+                          defaultValue={loc.assigned_volunteer_id || ''} 
+                          onChange={(e) => handleAssign(loc.id, e.target.value)}
+                          style={{ fontSize: '0.85rem', padding: '4px', marginBottom: 0 }}
+                        >
+                          <option value="">Unassigned</option>
+                          {volunteers.map(v => (
+                            <option key={v.id} value={v.id}>{v.email}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                      <a 
+                        href="https://aed.new" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="button primary" 
+                        style={{ fontSize: '0.8rem', padding: '6px 10px', textDecoration: 'none', textAlign: 'center' }}
+                      >
+                        Verify at aed.new
+                      </a>
+                      <button 
+                        onClick={() => navigate(`/locations/${loc.id}`)} 
+                        className="secondary"
+                        style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
+                      >
+                        Full Details
+                      </button>
+                    </div>
+                  </div>
                 </Popup>
               </Marker>
             );
@@ -530,10 +616,9 @@ const Map: React.FC = () => {
             <div className="form-group">
               <label>Status</label>
               <select value={manualData.status} onChange={e => setManualData({ ...manualData, status: e.target.value })}>
-                <option value="Unvisited">Unvisited</option>
-                <option value="Pending">Pending</option>
-                <option value="AED Located and Mapped at AED.new - Done">AED Located and Mapped at AED.new - Done</option>
-                <option value="Follow-up Required">Follow-up Required</option>
+                {statuses.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">
