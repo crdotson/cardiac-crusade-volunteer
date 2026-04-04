@@ -56,12 +56,23 @@ async function initDB() {
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
           email VARCHAR(255) UNIQUE NOT NULL,
+          name VARCHAR(255),
           password_hash VARCHAR(255),
           role VARCHAR(50) NOT NULL,
           roll_up_to_id INTEGER REFERENCES users(id),
           fido2_credentials JSONB DEFAULT '[]',
           social_ids JSONB DEFAULT '{}'
         );
+      `);
+
+      // Ensure 'name' column exists if table was already created
+      await pool.query(`
+        DO \$\$ 
+        BEGIN 
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='name') THEN
+            ALTER TABLE users ADD COLUMN name VARCHAR(255);
+          END IF;
+        END \$\$;
       `);
 
       await pool.query(`
@@ -528,14 +539,14 @@ mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Admi
 
         if (role === 'Application Administrator') {
             query = `
-                SELECT u.id, u.email, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
+                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
                 FROM users u 
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
             `;
         } else if (role === 'City Coordinator') {
             // City Coordinators see users they created OR users created by CHAARG leaders they supervise
             query = `
-                SELECT u.id, u.email, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
+                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
                 FROM users u 
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
                 WHERE u.roll_up_to_id = $1 
@@ -544,7 +555,7 @@ mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Admi
             params = [id];
         } else if (role === 'CHAARG leader') {
             query = `
-                SELECT u.id, u.email, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
+                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
                 FROM users u 
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
                 WHERE u.roll_up_to_id = $1
@@ -561,7 +572,7 @@ mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Admi
 });
 
 mainRouter.post('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
-    const { email, password, role } = req.body;
+    const { email, name, password, role } = req.body;
     const creatorRole = req.user.role;
     const creatorId = req.user.id;
 
@@ -576,12 +587,34 @@ mainRouter.post('/api/users', authenticateToken, authorizeRoles('Application Adm
     try {
         const hash = await bcrypt.hash(password, 10);
         const result = await pool.query(
-            'INSERT INTO users (email, password_hash, role, roll_up_to_id) VALUES ($1, $2, $3, $4) RETURNING id, email, role',
-            [email, hash, role, creatorId]
+            'INSERT INTO users (email, name, password_hash, role, roll_up_to_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role',
+            [email, name || null, hash, role, creatorId]
         );
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+mainRouter.post('/api/users/bulk', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    const { users } = req.body; // Array of { email, name, role, rolls_up_to_email }
+    try {
+        for (const u of users) {
+            let supervisorId = null;
+            if (u.rolls_up_to_email) {
+                const supervisorRes = await pool.query('SELECT id FROM users WHERE email = $1', [u.rolls_up_to_email]);
+                supervisorId = supervisorRes.rows[0]?.id || null;
+            }
+            const hash = await bcrypt.hash('changeme', 10); // Default password
+            await pool.query(
+                'INSERT INTO users (email, name, password_hash, role, roll_up_to_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING',
+                [u.email, u.name || null, hash, u.role || 'Volunteer', supervisorId]
+            );
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in bulk users route:', err);
         res.status(500).json({ error: err.message });
     }
 });
