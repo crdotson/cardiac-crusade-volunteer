@@ -366,6 +366,18 @@ const Map: React.FC = () => {
     }
   };
 
+  const handleDeleteLocation = async (id: number) => {
+    if (window.confirm('Delete this location?')) {
+      try {
+        await axios.delete(`api/locations/${id}`);
+        fetchLocations();
+      } catch (err) {
+        console.error('Failed to delete location', err);
+        alert('Failed to delete location.');
+      }
+    }
+  };
+
   const handleAssign = async (id: number, volunteerId: string) => {
     try {
       await axios.post(`api/locations/${id}/assign`, { volunteerId: volunteerId || null });
@@ -497,9 +509,18 @@ const Map: React.FC = () => {
                       >
                         Verify at aed.new
                       </a>
-                      </div>
-                      </div>
-                      </Popup>
+                      {['Application Administrator', 'City Coordinator'].includes(user?.role || '') && (
+                        <button 
+                          onClick={() => handleDeleteLocation(loc.id)} 
+                          className="danger-link" 
+                          style={{ color: 'red', marginTop: '10px', background: 'none', border: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          Delete Location
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
 
               </Marker>
             );
