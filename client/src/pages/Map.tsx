@@ -61,7 +61,10 @@ const CustomMarkerIcon = (color: string, isTarget: boolean) => {
 
 const formatCategoryName = (name: string) => {
   if (!name) return 'N/A';
-  return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  return name.replace(/_/g, ' ')
+             .split(' ')
+             .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+             .join(' ');
 };
 
 const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTool, onToolEnabled }: { 
@@ -152,6 +155,31 @@ const Map: React.FC = () => {
   const [manualData, setManualData] = useState<any>({
     name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', lat: 38.0406, lng: -84.5037
   });
+
+  useEffect(() => {
+    if (showManualAdd && (window as any).google) {
+      const google = (window as any).google;
+      const input = document.getElementById('address') as HTMLInputElement;
+      if (!input) return;
+      
+      const autocomplete = new google.maps.places.Autocomplete(input, {
+        types: ['address'],
+        fields: ['formatted_address', 'geometry']
+      });
+      
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry && place.geometry.location) {
+          setManualData((prev: any) => ({
+            ...prev,
+            address: place.formatted_address || '',
+            lat: place.geometry!.location!.lat(),
+            lng: place.geometry!.location!.lng()
+          }));
+        }
+      });
+    }
+  }, [showManualAdd]);
 
   const fetchLocations = async () => {
     try {
@@ -582,6 +610,10 @@ const Map: React.FC = () => {
               <label>Address *</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <input 
+                  name="address"
+                  id="address"
+                  autoComplete="street-address"
+                  data-1p-ignore
                   type="text" 
                   value={manualData.address} 
                   onChange={e => setManualData({ ...manualData, address: e.target.value })} 
