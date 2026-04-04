@@ -57,17 +57,64 @@ const Users: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       Papa.parse(file, {
-        header: true,
+        header: false,
         skipEmptyLines: true,
         complete: (results) => {
-          // Normalize headers to expected keys: email, name, role, rolls_up_to_email
-          const normalized = results.data.map((row: any) => ({
-            email: row.Email || row.email,
-            name: row.Name || row.name,
-            role: row.Role || row.role || 'Volunteer',
-            rolls_up_to_email: row['Rolls Up To'] || row.rolls_up_to_email || row.supervisor_email
-          }));
-          setImportData(normalized);
+          const rows = results.data as string[][];
+          if (rows.length === 0) return;
+
+          let data: any[] = [];
+          const firstRow = rows[0];
+          
+          // Detection: check if any cell in the first row contains "email" (case-insensitive)
+          const hasHeader = firstRow.some(cell => 
+            cell && typeof cell === 'string' && cell.toLowerCase().includes('email')
+          );
+
+          if (hasHeader) {
+            const headers = firstRow.map(h => (h || '').toLowerCase().trim());
+            const emailIdx = headers.findIndex(h => h.includes('email'));
+            const nameIdx = headers.findIndex(h => h.includes('name'));
+            const roleIdx = headers.findIndex(h => h.includes('role'));
+            const supervisorIdx = headers.findIndex(h => 
+              h.includes('rolls up to') || h.includes('supervisor') || h.includes('rolls_up_to')
+            );
+
+            data = rows.slice(1).map(row => ({
+              email: emailIdx !== -1 ? row[emailIdx] || '' : '',
+              name: nameIdx !== -1 ? row[nameIdx] || '' : '',
+              role: roleIdx !== -1 ? row[roleIdx] || 'Volunteer' : 'Volunteer',
+              rolls_up_to_email: supervisorIdx !== -1 ? row[supervisorIdx] || '' : ''
+            }));
+          } else {
+            // No headers: Map by index
+            data = rows.map(row => {
+              if (row.length === 1) {
+                return { 
+                  email: row[0] || '', 
+                  name: '', 
+                  role: 'Volunteer', 
+                  rolls_up_to_email: '' 
+                };
+              }
+              return {
+                email: row[0] || '',
+                name: row[1] || '',
+                role: row[2] || 'Volunteer',
+                rolls_up_to_email: row[3] || ''
+              };
+            });
+          }
+
+          // Ensure email is present and default role to Volunteer if missing
+          const finalData = data
+            .filter(u => u.email && u.email.trim() !== '')
+            .map(u => ({
+              ...u,
+              role: u.role || 'Volunteer'
+            }));
+
+          setImportData(finalData);
           setShowPreview(true);
         }
       });
