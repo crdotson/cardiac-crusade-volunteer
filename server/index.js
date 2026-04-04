@@ -619,6 +619,45 @@ mainRouter.post('/api/users/bulk', authenticateToken, authorizeRoles('Applicatio
     }
 });
 
+mainRouter.patch('/api/users/:id', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+    const { email, name, role, roll_up_to_id } = req.body;
+    const targetId = req.params.id;
+    const requesterRole = req.user.role;
+
+    try {
+        const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [targetId]);
+        if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+        const targetUser = userRes.rows[0];
+
+        // Role modification logic
+        if (role && role !== targetUser.role) {
+            if (requesterRole === 'CHAARG leader') {
+                return res.status(403).json({ message: 'CHAARG leaders cannot change roles' });
+            }
+            if (requesterRole === 'City Coordinator') {
+                if (!['City Coordinator', 'CHAARG leader', 'Volunteer'].includes(role)) {
+                    return res.status(403).json({ message: 'City Coordinators can only assign City Coordinator, CHAARG leader, or Volunteer roles' });
+                }
+            }
+            // Admins can set any role
+        }
+
+        const newEmail = email !== undefined ? email : targetUser.email;
+        const newName = name !== undefined ? name : targetUser.name;
+        const newRole = role !== undefined ? role : targetUser.role;
+        const newRollUpTo = roll_up_to_id !== undefined ? roll_up_to_id : targetUser.roll_up_to_id;
+
+        await pool.query(
+            'UPDATE users SET email=$1, name=$2, role=$3, roll_up_to_id=$4 WHERE id=$5',
+            [newEmail, newName, newRole, newRollUpTo, targetId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Settings Management ---
 
 mainRouter.get('/api/settings', authenticateToken, async (req, res) => {
@@ -732,6 +771,16 @@ mainRouter.post('/api/locations', authenticateToken, authorizeRoles('Application
     }
 });
 
+mainRouter.delete('/api/locations/:id', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    try {
+        await pool.query('DELETE FROM locations WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 mainRouter.get('/api/locations/:id', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(`
@@ -834,7 +883,7 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
         if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
 
         const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
-        const limit = parseInt(limitRes.rows[0]?.value || '20');
+        const limit = Math.min(parseInt(limitRes.rows[0]?.value || '20'), 20); // API max is 20
 
         const response = await axios.post('https://places.googleapis.com/v1/places:searchNearby', 
             { 
@@ -861,7 +910,7 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
 
         res.json(results);
     } catch (err) {
-        console.error('Error in search-nearby:', err);
+        console.error('Error in search-nearby:', err.response?.data || err.message);
         res.status(500).json({ error: err.message });
     }
 });
