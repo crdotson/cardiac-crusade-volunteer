@@ -127,6 +127,9 @@ const Map: React.FC = () => {
   
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<number>>(new Set());
+  
+  const [filterText, setFilterText] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('All');
 
   const fetchLocations = async () => {
     try {
@@ -270,6 +273,16 @@ const Map: React.FC = () => {
     setSelectedCandidates(new Set());
   };
 
+  const filteredCandidates = candidates
+    .map((c, originalIndex) => ({ ...c, originalIndex }))
+    .filter(c => {
+      const matchesText = c.name.toLowerCase().includes(filterText.toLowerCase()) || 
+                          c.address.toLowerCase().includes(filterText.toLowerCase());
+      const categories = c.categories || (c.category ? [c.category] : []);
+      const matchesCat = filterCategory === 'All' || categories.includes(filterCategory);
+      return matchesText && matchesCat;
+    });
+
   return (
     <div className="container" style={{ maxWidth: '100%', padding: '1rem' }}>
       <div className="card" style={{ marginBottom: '1rem' }}>
@@ -363,17 +376,32 @@ const Map: React.FC = () => {
               </>
             ) : (
               <>
+                <div className="filter-toolbar">
+                  <input 
+                    type="text" 
+                    placeholder="Filter results..." 
+                    value={filterText} 
+                    onChange={e => setFilterText(e.target.value)} 
+                  />
+                  <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+                    <option value="All">All Categories</option>
+                    {[...new Set(candidates.flatMap(c => c.categories || (c.category ? [c.category] : [])))].map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => setSelectedCandidates(new Set(filteredCandidates.map(c => c.originalIndex)))}>Select Filtered</button>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
                   <span>{selectedCandidates.size} of {candidates.length} selected</span>
                   <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={deselectAll}>Deselect All</button>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #eee', marginBottom: '1rem', borderRadius: '4px' }}>
-                  {candidates.map((c, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                  {filteredCandidates.map((c) => (
+                    <div key={c.originalIndex} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
                       <input 
                         type="checkbox" 
-                        checked={selectedCandidates.has(i)} 
-                        onChange={() => toggleCandidate(i)} 
+                        checked={selectedCandidates.has(c.originalIndex)} 
+                        onChange={() => toggleCandidate(c.originalIndex)} 
                         style={{ width: 'auto' }}
                       />
                       <div>
