@@ -883,7 +883,7 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
         if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
 
         const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
-        const limit = Math.min(parseInt(limitRes.rows[0]?.value || '20'), 20); // API max is 20
+        const limit = parseInt(limitRes.rows[0]?.value || '20');
 
         const response = await axios.post('https://places.googleapis.com/v1/places:searchNearby', 
             { 
@@ -900,17 +900,21 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
         );
 
         const results = (response.data.places || []).map(p => ({
-            name: p.displayName.text,
-            address: p.formattedAddress,
-            lat: p.location.latitude,
-            lng: p.location.longitude,
+            name: p.displayName?.text || 'Unknown',
+            address: p.formattedAddress || 'No Address',
+            lat: p.location?.latitude,
+            lng: p.location?.longitude,
             phone: p.internationalPhoneNumber || null,
-            categories: p.types // Use Google's types for filtering
+            categories: p.types || []
         }));
 
         res.json(results);
     } catch (err) {
-        console.error('Error in search-nearby:', err.response?.data || err.message);
+        const errorData = err.response?.data;
+        console.error('CRITICAL: search-nearby failure:', JSON.stringify(errorData || err.message));
+        if (errorData?.error?.status === 'PERMISSION_DENIED') {
+            return res.status(403).json({ message: `Google API Error: ${errorData.error.message}. Please ensure "Places API (New)" is enabled.` });
+        }
         res.status(500).json({ error: err.message });
     }
 });
@@ -947,6 +951,29 @@ mainRouter.post('/api/locations/confirm-import', authenticateToken, authorizeRol
         res.json({ success: true, importedCount });
     } catch (err) {
         console.error('Error in confirm-import route:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+mainRouter.post('/api/locations/geocode', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    const { address } = req.body;
+    try {
+        const keyRes = await pool.query("SELECT value FROM settings WHERE key = 'google_api_key'");
+        const apiKey = keyRes.rows[0]?.value;
+        if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
+
+        const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+            params: { address, key: apiKey }
+        });
+
+        if (response.data.status !== 'OK') {
+            console.error('Google Geocoding API Error:', response.data.status, response.data.error_message || '');
+            return res.status(400).json({ message: `Geocoding failed: ${response.data.status} ${response.data.error_message || ''}` });
+        }
+
+        const location = response.data.results[0].geometry.location;
+        res.json({ lat: location.lat, lng: location.lng, formatted_address: response.data.results[0].formatted_address });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
@@ -1138,6 +1165,10 @@ app.use(BASE_PATH, mainRouter);
 app.get('/', (req, res) => res.redirect(BASE_PATH));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+export default app;

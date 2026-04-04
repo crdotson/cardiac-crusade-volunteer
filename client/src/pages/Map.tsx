@@ -16,6 +16,14 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 // @ts-ignore
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'gm-place-autocomplete': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & { id?: string; slot?: string };
+    }
+  }
+}
+
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
@@ -60,11 +68,16 @@ const CustomMarkerIcon = (color: string, isTarget: boolean) => {
 };
 
 const formatCategoryName = (name: string) => {
-  if (!name) return 'N/A';
-  return name.replace(/_/g, ' ')
-             .split(' ')
-             .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-             .join(' ');
+  if (!name || typeof name !== 'string') return 'N/A';
+  try {
+    return name.replace(/_/g, ' ')
+               .split(' ')
+               .filter(Boolean)
+               .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+               .join(' ');
+  } catch (e) {
+    return name || 'N/A';
+  }
 };
 
 const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTool, onToolEnabled }: { 
@@ -150,56 +163,74 @@ const Map: React.FC = () => {
   
   const [filterText, setFilterText] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('All');
+  const [settings, setSettings] = useState<any>(null);
+  const [isGoogleLoaded, setIsGoogleLoaded] = useState(!!(window as any).google);
 
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [manualData, setManualData] = useState<any>({
     name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', lat: 38.0406, lng: -84.5037
   });
 
+  // Stable script loader
   useEffect(() => {
-    if (showManualAdd) {
-      const initAutocomplete = () => {
-        if (!(window as any).google) {
-          setTimeout(initAutocomplete, 100);
-          return;
-        }
-        const google = (window as any).google;
-        const input = document.getElementById('address') as HTMLInputElement;
-        if (!input) return;
-        
-        const autocomplete = new google.maps.places.Autocomplete(input, {
-          types: ['address'],
-          fields: ['formatted_address', 'geometry']
-        });
-        
-        // Fetch default_origin_city from settings to bias results
-        axios.get('api/settings').then(res => {
-          const city = res.data.default_origin_city;
-          if (city) {
-            const geocoder = new google.maps.Geocoder();
-            geocoder.geocode({ address: city }, (results: any, status: any) => {
-              if (status === 'OK' && results![0].geometry.viewport) {
-                autocomplete.setBounds(results![0].geometry.viewport);
+    if (settings?.google_api_key && !(window as any).google) {
+      const script = document.createElement('script');
+      // Using v=beta is required to use Autocomplete with the Places API (New) model
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.google_api_key}&v=beta&loading=async`;
+      script.async = true;
+      script.onload = () => {
+        console.log('Google Maps Beta Script Loaded');
+        setIsGoogleLoaded(true);
+      };
+      script.onerror = () => console.error('Google Maps Script Load Error');
+      document.head.appendChild(script);
+    }
+  }, [settings]);
+
+  // Autocomplete initialization
+  useEffect(() => {
+    if (showManualAdd && isGoogleLoaded) {
+      const timer = setTimeout(async () => {
+        try {
+          const g = (window as any).google;
+          // Use the modern library loading pattern
+          await g.maps.importLibrary("places");
+
+          const autocompleteElement = document.getElementById('address-autocomplete');
+          if (!autocompleteElement) return;
+          
+          if (settings?.default_origin_city) {
+            const { Geocoder } = await g.maps.importLibrary("geocoding");
+            const geocoder = new Geocoder();
+            geocoder.geocode({ address: settings.default_origin_city }, (results: any, status: any) => {
+              if (status === 'OK' && results?.[0]?.geometry?.viewport) {
+                (autocompleteElement as any).locationBias = results[0].geometry.viewport;
               }
             });
           }
-        });
 
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          if (place.geometry && place.geometry.location) {
-            setManualData((prev: any) => ({
-              ...prev,
-              address: place.formatted_address || '',
-              lat: place.geometry!.location!.lat(),
-              lng: place.geometry!.location!.lng()
-            }));
-          }
-        });
-      };
-      initAutocomplete();
+          autocompleteElement.addEventListener('gm-place-changed', () => {
+            try {
+              const place = (autocompleteElement as any).value;
+              if (place && place.location) {
+                setManualData((prev: any) => ({
+                  ...prev,
+                  address: place.formattedAddress || place.displayName || prev.address || '',
+                  lat: place.location.lat(),
+                  lng: place.location.lng()
+                }));
+              }
+            } catch (e) {
+              console.warn('Place selection error:', e);
+            }
+          });
+        } catch (err) {
+          console.error('Autocomplete Error:', err);
+        }
+      }, 200);
+      return () => clearTimeout(timer);
     }
-  }, [showManualAdd]);
+  }, [showManualAdd, isGoogleLoaded, settings]);
 
   const fetchLocations = async () => {
     try {
@@ -207,6 +238,15 @@ const Map: React.FC = () => {
       setLocations(res.data);
     } catch (err) {
       console.error('Failed to fetch locations', err);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const res = await axios.get('api/settings');
+      setSettings(res.data);
+    } catch (err) {
+      console.error('Failed to fetch settings', err);
     }
   };
 
@@ -236,6 +276,7 @@ const Map: React.FC = () => {
     fetchLocations();
     fetchVolunteers();
     fetchCategories();
+    fetchSettings();
   }, [user]);
 
   useEffect(() => {
@@ -354,7 +395,7 @@ const Map: React.FC = () => {
         dataToSave.lng = res.data.lng;
         dataToSave.address = res.data.formatted_address;
       } catch (err: any) {
-        alert('Could not find location for this address. Please be more specific or select an option from the list.');
+        alert('Could not find location for this address. Please ensure "Geocoding API" is enabled in your Google Cloud Console, or select an option from the autocomplete list.');
         return;
       }
     }
@@ -424,11 +465,11 @@ const Map: React.FC = () => {
 
   const canAssign = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
 
-  const filteredCandidates = candidates
+  const filteredCandidates = (candidates || [])
     .map((c, originalIndex) => ({ ...c, originalIndex }))
     .filter(c => {
-      const matchesText = c.name.toLowerCase().includes(filterText.toLowerCase()) || 
-                          c.address.toLowerCase().includes(filterText.toLowerCase());
+      const matchesText = (c.name || '').toLowerCase().includes(filterText.toLowerCase()) || 
+                          (c.address || '').toLowerCase().includes(filterText.toLowerCase());
       const categories = c.categories || (c.category ? [c.category] : []);
       const matchesCat = filterCategory === 'All' || categories.includes(filterCategory);
       return matchesText && matchesCat;
@@ -665,16 +706,19 @@ const Map: React.FC = () => {
             <div className="form-group">
               <label>Address *</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input 
-                  name="address"
-                  id="address"
-                  autoComplete="street-address"
-                  data-1p-ignore
-                  type="text" 
-                  value={manualData.address} 
-                  onChange={e => setManualData({ ...manualData, address: e.target.value })} 
-                  placeholder="Street, City, State, Zip"
-                />
+                <gm-place-autocomplete id="address-autocomplete" style={{ width: '100%' }}>
+                  <input 
+                    slot="input"
+                    name="address"
+                    id="address"
+                    autoComplete="street-address"
+                    data-1p-ignore
+                    type="text" 
+                    value={manualData.address} 
+                    onChange={e => setManualData({ ...manualData, address: e.target.value })} 
+                    placeholder="Street, City, State, Zip"
+                  />
+                </gm-place-autocomplete>
                 <button onClick={useMyLocation} title="Use My Location" style={{ padding: '0.5rem' }}>📍</button>
               </div>
             </div>
