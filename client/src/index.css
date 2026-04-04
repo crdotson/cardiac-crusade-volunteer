@@ -171,6 +171,28 @@ input, select {
 .modal-content {
   max-width: 500px;
   width: 90%;
+  position: relative;
+}
+
+.close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--gray);
+  padding: 0;
+  line-height: 1;
+  width: auto;
+  margin-bottom: 0;
+}
+
+.close-btn:hover {
+  color: var(--text-color);
+  opacity: 1;
 }
 
 /* Tables */

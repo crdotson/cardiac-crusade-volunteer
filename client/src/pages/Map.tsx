@@ -59,6 +59,11 @@ const CustomMarkerIcon = (color: string, isTarget: boolean) => {
   });
 };
 
+const formatCategoryName = (name: string) => {
+  if (!name) return 'N/A';
+  return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
+
 const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTool, onToolEnabled }: { 
   onDrawCreated: (bounds: L.LatLngBounds) => void, 
   onCircleCreated: (center: L.LatLng, radius: number) => void,
@@ -71,6 +76,9 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTo
   useEffect(() => {
     if (activeTool === 'Circle') {
       map.pm.enableDraw('Circle');
+      onToolEnabled(null);
+    } else if (activeTool === 'Rectangle') {
+      map.pm.enableDraw('Rectangle');
       onToolEnabled(null);
     }
   }, [activeTool, map, onToolEnabled]);
@@ -336,7 +344,15 @@ const Map: React.FC = () => {
             {['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '') && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid #ddd', paddingLeft: '1rem' }}>
                 <label style={{ whiteSpace: 'nowrap' }}>Assign to:</label>
-                <select value={selectedVolunteer} onChange={(e) => setSelectedVolunteer(e.target.value)} style={{ marginBottom: 0 }}>
+                <select 
+                  value={selectedVolunteer} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedVolunteer(val);
+                    if (val) setActiveTool('Rectangle');
+                  }} 
+                  style={{ marginBottom: 0 }}
+                >
                   <option value="">Select Volunteer</option>
                   {volunteers.map(v => (
                     <option key={v.id} value={v.id}>{v.email} ({v.role})</option>
@@ -395,6 +411,7 @@ const Map: React.FC = () => {
       {showImport && (
         <div className="modal-overlay">
           <div className="modal-content card" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <button className="close-btn" onClick={() => { setShowImport(false); setCandidates([]); }}>&times;</button>
             <h3>Import from Google Places</h3>
             {!candidates.length ? (
               <>
@@ -449,7 +466,8 @@ const Map: React.FC = () => {
                       />
                       <div>
                         <strong>{c.name}</strong><br />
-                        <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span>
+                        <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
+                        <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category || (c.categories && c.categories[0]))}</span>
                       </div>
                     </div>
                   ))}
@@ -459,7 +477,7 @@ const Map: React.FC = () => {
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={handleConfirmImport}>Confirm Import</button>
-                    <button className="secondary" onClick={() => setCandidates([])}>Back to Search</button>
+                    <button className="secondary" onClick={() => { setShowImport(false); setCandidates([]); }}>Cancel</button>
                   </div>
                 )}
               </>
@@ -471,6 +489,7 @@ const Map: React.FC = () => {
       {showManualAdd && (
         <div className="modal-overlay">
           <div className="modal-content card" style={{ maxWidth: '500px' }}>
+            <button className="close-btn" onClick={() => setShowManualAdd(false)}>&times;</button>
             <h3>Manually Add Location</h3>
             <div className="form-group">
               <label>Name *</label>
