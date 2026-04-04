@@ -6,7 +6,6 @@ import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 
 // Fix Leaflet marker icon issue
@@ -132,7 +131,6 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTo
 
 const Map: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [locations, setLocations] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [selectedVolunteer, setSelectedVolunteer] = useState<string>('');
