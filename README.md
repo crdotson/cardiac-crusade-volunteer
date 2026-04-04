@@ -1,6 +1,6 @@
 # Cardiac Crusade Volunteer App
 
-A comprehensive web application for coordinating volunteers to map Automated External Defibrillators (AEDs) and save lives during cardiac emergencies.
+A comprehensive web application for coordinating volunteers to map Automated External Defibrillators (AEDs) and save lives during cardiac emergencies. 
 
 ## Key Features
 
