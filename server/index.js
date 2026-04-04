@@ -793,6 +793,42 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
     }
 });
 
+mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    const { lat, lng, radius } = req.body; // radius in meters
+    try {
+        const keyRes = await pool.query("SELECT value FROM settings WHERE key = 'google_api_key'");
+        const apiKey = keyRes.rows[0]?.value;
+        if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
+
+        const response = await axios.post('https://places.googleapis.com/v1/places:searchNearby', 
+            { 
+                locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: radius } }
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': apiKey,
+                    'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.types'
+                }
+            }
+        );
+
+        const results = (response.data.places || []).map(p => ({
+            name: p.displayName.text,
+            address: p.formattedAddress,
+            lat: p.location.latitude,
+            lng: p.location.longitude,
+            phone: p.internationalPhoneNumber || null,
+            categories: p.types // Use Google's types for filtering
+        }));
+
+        res.json(results);
+    } catch (err) {
+        console.error('Error in search-nearby:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 mainRouter.post('/api/locations/confirm-import', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { locations } = req.body;
     try {

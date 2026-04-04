@@ -59,7 +59,11 @@ const CustomMarkerIcon = (color: string, isTarget: boolean) => {
   });
 };
 
-const MapEvents = ({ onDrawCreated, selectedVolunteer }: { onDrawCreated: (bounds: L.LatLngBounds) => void, selectedVolunteer: string }) => {
+const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer }: { 
+  onDrawCreated: (bounds: L.LatLngBounds) => void, 
+  onCircleCreated: (center: L.LatLng, radius: number) => void,
+  selectedVolunteer: string 
+}) => {
   const map = useMap();
 
   useEffect(() => {
@@ -69,7 +73,7 @@ const MapEvents = ({ onDrawCreated, selectedVolunteer }: { onDrawCreated: (bound
       drawPolyline: false,
       drawRectangle: true,
       drawPolygon: false,
-      drawCircle: false,
+      drawCircle: true,
       drawMarker: false,
       drawText: false,
       cutPolygon: false,
@@ -79,7 +83,7 @@ const MapEvents = ({ onDrawCreated, selectedVolunteer }: { onDrawCreated: (bound
     });
 
     map.on('pm:drawstart', (e: any) => {
-      if (e.shape === 'Rectangle' && !selectedVolunteer) {
+      if ((e.shape === 'Rectangle' || e.shape === 'Circle') && !selectedVolunteer) {
         alert('Please select a volunteer first.');
         map.pm.disableDraw();
       }
@@ -92,6 +96,9 @@ const MapEvents = ({ onDrawCreated, selectedVolunteer }: { onDrawCreated: (bound
         onDrawCreated(bounds);
         // Optionally remove the layer after capturing bounds if we don't want it to stay
         // layer.remove(); 
+      } else if (e.shape === 'Circle') {
+        onCircleCreated(e.layer.getLatLng(), e.layer.getRadius());
+        e.layer.remove(); // Remove temporary circle after search
       }
     });
 
@@ -189,6 +196,25 @@ const Map: React.FC = () => {
     } catch (err) {
       console.error('Failed to assign locations', err);
       alert('Failed to assign locations.');
+    }
+  };
+
+  const handleCircleCreated = async (center: L.LatLng, radius: number) => {
+    setIsImporting(true);
+    setShowImport(true); // Open the unified modal
+    setCandidates([]);
+    try {
+      const res = await axios.post('api/locations/search-nearby', {
+        lat: center.lat,
+        lng: center.lng,
+        radius: radius
+      });
+      setCandidates(res.data);
+      setSelectedCandidates(new Set(res.data.map((_: any, i: number) => i)));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Nearby search failed.');
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -302,7 +328,11 @@ const Map: React.FC = () => {
               </Marker>
             );
           })}
-          <MapEvents onDrawCreated={handleAreaAssignment} selectedVolunteer={selectedVolunteer} />
+          <MapEvents 
+            onDrawCreated={handleAreaAssignment} 
+            onCircleCreated={handleCircleCreated}
+            selectedVolunteer={selectedVolunteer} 
+          />
         </MapContainer>
       </div>
 
