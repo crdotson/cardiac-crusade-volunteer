@@ -43,29 +43,30 @@ This document outlines the execution strategy for the Cardiac Crusade Volunteer 
 *   [ ] **Settings View**:
     *   Password/Passkey/Social management.
     *   Admin controls: Google API configuration, Database Backup/Restore logic.
-
 ### Phase 3: Map & List Foundation
-*   [ ] Integrate Leaflet.js.
-*   [ ] Implement **List View** for browsing locations.
-* [ ] Implement **Google Places Import**:
+*   [x] Initialize React and Express projects with TypeScript.
+*   [x] Set up Docker Compose for PostgreSQL and the application.
+*   [x] Implement **List View** for browsing locations.
+*   [x] Implement **Google Places Import**:
     *   Dropdown using `CATEGORIES.txt`.
-    *   Lexington, KY as default city.
+    *   **New**: Support for "Import by Category" and "Import by Area" (circular search).
     *   Fuzzy deduplication logic (Name + Address).
-    *   Pre-import review screen with selection toggles.
-    *   **New**: Automatic assignment of imported locations if they fall within existing assignment rectangles.
-
+    *   **New**: Pre-import review screen with "Excel-like" real-time filtering (Name, Address, Category).
+    *   [x] Automatic assignment of imported locations if they fall within existing assignment rectangles.
 
 ### Phase 4: Assignment & Interaction
-*   [ ] **Geographical Assignment**:
+*   [x] **Geographical Assignment**:
     *   Implement rectangle drawing and resizing.
     *   Logic to count and assign locations within bounds.
-*   [ ] **Manual Assignment**:
+*   [x] **Manual Addition & Assignment**:
+    *   **New**: Manual addition modal with Google Places Autocomplete and "Use My Location" support.
     *   Map/List selection logic.
     *   Precedence logic (Manual override over Area).
-*   [ ] **Location Details**:
+*   [x] **Location Details**:
     *   External link to `aed.new`.
     *   Status update workflow with Audit Logging.
     *   Confetti animation and confirmation for "Done" statuses.
+
 
 ### Phase 5: Reporting & Refinement
 *   [ ] **Reporting View**:
