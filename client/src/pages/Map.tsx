@@ -462,25 +462,19 @@ const Map: React.FC = () => {
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                      <a 
-                        href="https://aed.new" 
-                        target="_blank" 
+                      <a
+                        href="https://aed.new"
+                        target="_blank"
                         rel="noopener noreferrer"
-                        className="button primary" 
+                        className="button primary"
                         style={{ fontSize: '0.8rem', padding: '6px 10px', textDecoration: 'none', textAlign: 'center' }}
                       >
                         Verify at aed.new
                       </a>
-                      <button 
-                        onClick={() => navigate(`/locations/${loc.id}`)} 
-                        className="secondary"
-                        style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
-                      >
-                        Full Details
-                      </button>
-                    </div>
-                  </div>
-                </Popup>
+                      </div>
+                      </div>
+                      </Popup>
+
               </Marker>
             );
           })}
