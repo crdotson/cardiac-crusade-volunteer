@@ -131,6 +131,7 @@ async function initDB() {
       // Default settings
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['google_api_key', '']);
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['google_places_limit', '10']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['default_origin_city', 'Lexington, KY']);
 
       console.log('Database initialized');
       break;
@@ -680,6 +681,20 @@ mainRouter.get('/api/locations', authenticateToken, async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+mainRouter.post('/api/locations', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    const { name, address, lat, lng, phone, category, assigned_volunteer_id, status } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+            [name, address, lat, lng, phone, category, status || 'Unvisited', assigned_volunteer_id || null, assigned_volunteer_id ? 'Manual' : null]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error adding location:', err);
         res.status(500).json({ error: err.message });
     }
 });
