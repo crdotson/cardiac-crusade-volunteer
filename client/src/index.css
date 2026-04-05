@@ -329,3 +329,10 @@ th {
 .pac-container {
   z-index: 10000 !important; /* Ensure it stays above modals */
 }
+
+/* Modern PlaceAutocompleteElement dropdown classes */
+.gm-place-autocomplete-dropdown, 
+gm-place-autocomplete::part(dropdown),
+.gm-popover-container {
+  z-index: 10000 !important;
+}

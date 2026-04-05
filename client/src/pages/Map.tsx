@@ -175,8 +175,8 @@ const Map: React.FC = () => {
   useEffect(() => {
     if (settings?.google_api_key && !(window as any).google) {
       const script = document.createElement('script');
-      // Using v=beta is required to use Autocomplete with the Places API (New) model
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.google_api_key}&v=beta&loading=async`;
+      // Adding libraries=places back with v=beta is the standard way to enable modern components
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.google_api_key}&v=beta&libraries=places&loading=async`;
       script.async = true;
       script.onload = () => {
         console.log('Google Maps Beta Script Loaded');
@@ -193,41 +193,63 @@ const Map: React.FC = () => {
       const timer = setTimeout(async () => {
         try {
           const g = (window as any).google;
-          // Use the modern library loading pattern
-          await g.maps.importLibrary("places");
+          if (!g?.maps) return;
 
-          const autocompleteElement = document.getElementById('address-autocomplete');
-          if (!autocompleteElement) return;
+          const { PlaceAutocompleteElement } = await g.maps.importLibrary("places");
+          
+          const container = document.getElementById('autocomplete-container');
+          if (!container) return;
+          
+          // Clear existing content
+          container.innerHTML = '';
+          
+          const autocomplete = new PlaceAutocompleteElement();
+          
+          // Style the element to match our UI
+          autocomplete.style.width = '100%';
           
           if (settings?.default_origin_city) {
             const { Geocoder } = await g.maps.importLibrary("geocoding");
             const geocoder = new Geocoder();
             geocoder.geocode({ address: settings.default_origin_city }, (results: any, status: any) => {
               if (status === 'OK' && results?.[0]?.geometry?.viewport) {
-                (autocompleteElement as any).locationBias = results[0].geometry.viewport;
+                autocomplete.locationBias = results[0].geometry.viewport;
               }
             });
           }
 
-          autocompleteElement.addEventListener('gm-place-changed', () => {
-            try {
-              const place = (autocompleteElement as any).value;
-              if (place && place.location) {
-                setManualData((prev: any) => ({
-                  ...prev,
-                  address: place.formattedAddress || place.displayName || prev.address || '',
-                  lat: place.location.lat(),
-                  lng: place.location.lng()
-                }));
-              }
-            } catch (e) {
-              console.warn('Place selection error:', e);
+          autocomplete.addEventListener('gm-placechange', () => {
+            const place = autocomplete.value;
+            console.log('Modern Place selected:', place);
+            if (place) {
+              setManualData((prev: any) => ({
+                ...prev,
+                address: place.formattedAddress || place.displayName || prev.address || '',
+                lat: place.location ? place.location.lat() : prev.lat,
+                lng: place.location ? place.location.lng() : prev.lng
+              }));
             }
           });
+
+          container.appendChild(autocomplete);
+          
+          // Find the internal input and apply our attributes for 1Password
+          const internalInput = autocomplete.querySelector('input');
+          if (internalInput) {
+            internalInput.setAttribute('data-1p-ignore', 'true');
+            internalInput.placeholder = "Search for an address...";
+            
+            // Sync typed value back to state even if no place is selected
+            internalInput.addEventListener('input', (e: any) => {
+              setManualData((prev: any) => ({ ...prev, address: e.target.value }));
+            });
+          }
+
+          console.log('Modern Autocomplete initialized');
         } catch (err) {
-          console.error('Autocomplete Error:', err);
+          console.error('Modern Autocomplete Error:', err);
         }
-      }, 200);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [showManualAdd, isGoogleLoaded, settings]);
@@ -705,21 +727,18 @@ const Map: React.FC = () => {
             </div>
             <div className="form-group">
               <label>Address *</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <gm-place-autocomplete id="address-autocomplete" style={{ width: '100%' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                <div id="autocomplete-container" style={{ width: '100%', minHeight: '40px' }}>
+                  {/* Google will inject the modern autocomplete here */}
                   <input 
-                    slot="input"
-                    name="address"
-                    id="address"
-                    autoComplete="street-address"
-                    data-1p-ignore
                     type="text" 
                     value={manualData.address} 
                     onChange={e => setManualData({ ...manualData, address: e.target.value })} 
-                    placeholder="Street, City, State, Zip"
+                    placeholder="Type address if suggestions don't appear..."
+                    data-1p-ignore
                   />
-                </gm-place-autocomplete>
-                <button onClick={useMyLocation} title="Use My Location" style={{ padding: '0.5rem' }}>📍</button>
+                </div>
+                <button onClick={useMyLocation} title="Use My Location" className="secondary" style={{ width: '100%', marginTop: '5px' }}>📍 Use My Current Location</button>
               </div>
             </div>
             <div className="form-group">

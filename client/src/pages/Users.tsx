@@ -22,6 +22,7 @@ const Users: React.FC = () => {
   const [message, setMessage] = useState('');
   const [importData, setImportData] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const { user: currentUser } = useAuth();
 
   const fetchUsers = async () => {
@@ -89,9 +90,10 @@ const Users: React.FC = () => {
           } else {
             // No headers: Map by index
             data = rows.map(row => {
-              if (row.length === 1) {
+              const values = Object.values(row).filter(v => v !== null && v !== undefined && String(v).trim() !== '');
+              if (values.length === 1) {
                 return { 
-                  email: row[0] || '', 
+                  email: values[0], 
                   name: '', 
                   role: 'Volunteer', 
                   rolls_up_to_email: '' 
@@ -131,6 +133,55 @@ const Users: React.FC = () => {
     } catch (err: any) {
       setError('Bulk import failed');
     }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setError('');
+    setMessage('');
+    try {
+      let roll_up_to_id = editingUser.roll_up_to_id;
+      // Resolve supervisor email to ID if provided
+      if (editingUser.roll_up_to_email && editingUser.roll_up_to_email.trim() !== '') {
+        const emailToFind = editingUser.roll_up_to_email.trim();
+        if (emailToFind === currentUser?.email) {
+          roll_up_to_id = currentUser.id;
+        } else {
+          const supervisor = users.find(u => u.email === emailToFind);
+          if (supervisor) {
+            roll_up_to_id = supervisor.id;
+          } else {
+            setError('Supervisor email not found in your user list');
+            return;
+          }
+        }
+      } else {
+        roll_up_to_id = null;
+      }
+
+      await axios.patch(`api/users/${editingUser.id}`, { 
+        email: editingUser.email, 
+        name: editingUser.name, 
+        role: editingUser.role,
+        roll_up_to_id 
+      });
+      setMessage('User updated successfully');
+      setEditingUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update user');
+    }
+  };
+
+  const getEditRoles = () => {
+    if (currentUser?.role === 'Application Administrator') {
+      return ['Application Administrator', 'City Coordinator', 'CHAARG leader', 'Volunteer'];
+    }
+    if (currentUser?.role === 'City Coordinator') {
+      return ['City Coordinator', 'CHAARG leader', 'Volunteer'];
+    }
+    return [];
   };
 
   const getAvailableRoles = () => {
@@ -202,6 +253,7 @@ const Users: React.FC = () => {
               <th style={{ padding: '1rem' }}>Name</th>
               <th style={{ padding: '1rem' }}>Role</th>
               <th style={{ padding: '1rem' }}>Rolls Up To</th>
+              <th style={{ padding: '1rem' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -212,6 +264,9 @@ const Users: React.FC = () => {
                 <td style={{ padding: '1rem' }}>{u.role}</td>
                 <td style={{ padding: '1rem' }}>
                   {u.roll_up_to_email || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>(will not be included in reporting)</span>}
+                </td>
+                <td style={{ padding: '1rem' }}>
+                  <button className="button secondary small" onClick={() => setEditingUser(u)}>Edit</button>
                 </td>
               </tr>
             ))}
@@ -250,6 +305,64 @@ const Users: React.FC = () => {
               <button className="secondary" onClick={() => setShowPreview(false)}>Cancel</button>
               <button className="primary" onClick={handleBulkImport}>Import {importData.length} Users</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div className="modal-overlay">
+          <div className="card modal-content" style={{ maxWidth: '600px', width: '90%' }}>
+            <button className="close-btn" onClick={() => setEditingUser(null)}>&times;</button>
+            <h2 style={{ color: 'var(--primary-color)' }}>Edit User</h2>
+            <form onSubmit={handleUpdateUser}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label>Email</label>
+                <input 
+                  type="email" 
+                  value={editingUser.email} 
+                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })} 
+                  required 
+                />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label>Name</label>
+                <input 
+                  type="text" 
+                  value={editingUser.name || ''} 
+                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })} 
+                />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label>Role</label>
+                <select 
+                  value={editingUser.role} 
+                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                  disabled={currentUser?.role === 'CHAARG leader'}
+                >
+                  {(currentUser?.role === 'Application Administrator' || currentUser?.role === 'City Coordinator') ? (
+                    getEditRoles().map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))
+                  ) : (
+                    <option value={editingUser.role}>{editingUser.role}</option>
+                  )}
+                </select>
+              </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label>Rolls Up To (Email)</label>
+                <input 
+                  type="text" 
+                  placeholder="Supervisor email"
+                  value={editingUser.roll_up_to_email || ''} 
+                  onChange={(e) => setEditingUser({ ...editingUser, roll_up_to_email: e.target.value })}
+                />
+                <small style={{ color: 'var(--gray)' }}>Changing this requires the supervisor to already exist.</small>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button type="button" className="secondary" onClick={() => setEditingUser(null)}>Cancel</button>
+                <button type="submit" className="primary">Save Changes</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

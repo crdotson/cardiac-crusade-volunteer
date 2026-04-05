@@ -58,14 +58,27 @@ This document outlines the execution strategy for the Cardiac Crusade Volunteer 
 *   [x] **Geographical Assignment**:
     *   Implement rectangle drawing and resizing.
     *   Logic to count and assign locations within bounds.
+    *   **New**: Automated tool activation when selecting a volunteer.
 *   [x] **Manual Addition & Assignment**:
-    *   **New**: Manual addition modal with Google Places Autocomplete and "Use My Location" support.
+    *   **New**: Manual addition modal using modern **PlaceAutocompleteElement (New)**.
+    *   **New**: Backend Geocoding fallback using `searchText` (v1).
     *   Map/List selection logic.
-    *   Precedence logic (Manual override over Area).
-*   [x] **Location Details**:
+*   [x] **Integrated Location Management**:
+    *   Moved all details/actions into map popups.
+    *   Status updates, assignments, and deletion.
     *   External link to `aed.new`.
-    *   Status update workflow with Audit Logging.
-    *   Confetti animation and confirmation for "Done" statuses.
+    *   Confetti animation for "Done" statuses.
+
+### Phase 5: User Management & Bulk Operations
+*   [x] **Enhanced User Records**:
+    *   Added `name` field to users.
+    *   Implemented role-based user editing (Admins/Coordinators/Leaders).
+*   [x] **CSV Bulk Import**:
+    *   Support for headerless and email-only files.
+    *   Pre-import preview and validation.
+*   [x] **Modern Google API Migration**:
+    *   Transitioned to Places API (New) for nearby search and geocoding.
+    *   Dynamic runtime script loading via backend settings.
 
 
 ### Phase 5: Reporting & Refinement

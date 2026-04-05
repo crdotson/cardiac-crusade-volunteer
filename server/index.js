@@ -962,18 +962,34 @@ mainRouter.post('/api/locations/geocode', authenticateToken, authorizeRoles('App
         const apiKey = keyRes.rows[0]?.value;
         if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
 
-        const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-            params: { address, key: apiKey }
-        });
+        // Use Places API (New) searchText instead of Geocoding API for better compatibility
+        const response = await axios.post('https://places.googleapis.com/v1/places:searchText', 
+            { 
+                textQuery: address,
+                maxResultCount: 1 
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': apiKey,
+                    'X-Goog-FieldMask': 'places.location,places.formattedAddress,places.displayName'
+                }
+            }
+        );
 
-        if (response.data.status !== 'OK') {
-            console.error('Google Geocoding API Error:', response.data.status, response.data.error_message || '');
-            return res.status(400).json({ message: `Geocoding failed: ${response.data.status} ${response.data.error_message || ''}` });
+        if (!response.data.places || response.data.places.length === 0) {
+            console.error('Google Places SearchText Error: No results for', address);
+            return res.status(400).json({ message: `Could not find location for: ${address}. Google returned no results.` });
         }
 
-        const location = response.data.results[0].geometry.location;
-        res.json({ lat: location.lat, lng: location.lng, formatted_address: response.data.results[0].formatted_address });
+        const place = response.data.places[0];
+        res.json({ 
+            lat: place.location.latitude, 
+            lng: place.location.longitude, 
+            formatted_address: place.formattedAddress || place.displayName.text 
+        });
     } catch (err) {
+        console.error('CRITICAL: geocode failure:', JSON.stringify(err.response?.data || err.message));
         res.status(500).json({ error: err.message });
     }
 });
