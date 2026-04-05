@@ -22,7 +22,7 @@ const __dirname = import.meta.dirname;
 const app = express();
 app.set('trust proxy', 1); // Trust the reverse proxy
 app.use(cors({
-    origin: ['https://www.dotson97.org', 'http://localhost:1443'],
+    origin: ['https://www.dotson97.org', 'https://test-cardiaccrusade.dotson97.org', 'http://localhost:1443'],
     credentials: true,
 }));
 app.use(express.json());
@@ -1170,7 +1170,8 @@ mainRouter.use((req, res) => {
   try {
     let indexHtml = fs.readFileSync(indexPath, 'utf8');
     // Inject the base tag and window variable
-    const injection = `<base href="${BASE_PATH}/"><script>window.__BASE_PATH__ = "${BASE_PATH}";</script>`;
+    const baseHref = BASE_PATH.endsWith('/') ? BASE_PATH : `${BASE_PATH}/`;
+    const injection = `<base href="${baseHref}"><script>window.__BASE_PATH__ = "${BASE_PATH}";</script>`;
     indexHtml = indexHtml.replace('<head>', '<head>' + injection);
     res.send(indexHtml);
   } catch (err) {
