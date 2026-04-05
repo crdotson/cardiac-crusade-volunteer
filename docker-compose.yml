@@ -10,6 +10,7 @@ services:
       - POSTGRES_HOST=db
       - ORIGIN=https://www.dotson97.org
       - RP_ID=www.dotson97.org
+      - BASE_PATH=/cardiac-crusade
     depends_on:
       - db
     restart: unless-stopped

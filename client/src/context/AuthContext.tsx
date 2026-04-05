@@ -19,7 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Set axios defaults
 axios.defaults.withCredentials = true;
-axios.defaults.baseURL = '/cardiac-crusade/';
+axios.defaults.baseURL = window.__BASE_PATH__ || '/cardiac-crusade/';
 
 export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

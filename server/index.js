@@ -4,6 +4,7 @@ const { Pool } = pg;
 import bcrypt from 'bcrypt';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import nodemailer from 'nodemailer';
@@ -1163,9 +1164,18 @@ mainRouter.post('/api/admin/restore', authenticateToken, authorizeRoles('Applica
 });
 
 // Serve frontend static files
-mainRouter.use(express.static(path.join(__dirname, '../client/dist')));
+mainRouter.use(express.static(path.join(__dirname, '../client/dist'), { index: false }));
 mainRouter.use((req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  const indexPath = path.join(__dirname, '../client/dist/index.html');
+  try {
+    let indexHtml = fs.readFileSync(indexPath, 'utf8');
+    // Inject the base tag and window variable
+    const injection = `<base href="${BASE_PATH}/"><script>window.__BASE_PATH__ = "${BASE_PATH}";</script>`;
+    indexHtml = indexHtml.replace('<head>', '<head>' + injection);
+    res.send(indexHtml);
+  } catch (err) {
+    res.status(500).send('Error loading index.html');
+  }
 });
 
 app.use(BASE_PATH, mainRouter);

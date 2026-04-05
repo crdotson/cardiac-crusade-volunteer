@@ -37,7 +37,8 @@ The recommended way to deploy the application locally for testing after making c
     cd cardiac-crusade
     ```
 2.  **Configure Environment**:
-    Copy the example environment file and adjust values if needed:
+    Copy the example environment file and adjust values if needed. 
+    You can specify a custom `BASE_PATH` here to change the URL path the app is deployed under without requiring a rebuild:
     ```bash
     cp .env.example .env
     ```

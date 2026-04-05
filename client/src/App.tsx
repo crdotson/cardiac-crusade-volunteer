@@ -36,7 +36,7 @@ const Dashboard: FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router basename="/cardiac-crusade">
+      <Router basename={window.__BASE_PATH__ || '/cardiac-crusade'}>
         <div className="App">
           <Navbar />
           <Routes>
