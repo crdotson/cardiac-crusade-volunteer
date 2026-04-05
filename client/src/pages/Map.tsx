@@ -218,31 +218,43 @@ const Map: React.FC = () => {
             });
           }
 
-          autocomplete.addEventListener('gm-placechange', () => {
-            const place = autocomplete.value;
-            console.log('Modern Place selected:', place);
-            if (place) {
+          const handlePlaceSelect = async (e: any) => {
+            console.log('Place changed/selected event fired:', e.type);
+            const rawPlace = e.place || autocomplete.value || autocomplete.place || (e.placePrediction && typeof e.placePrediction.toPlace === 'function' ? e.placePrediction.toPlace() : null);
+            console.log('Selected place object:', rawPlace);
+            
+            if (rawPlace) {
+              // Ensure we have the required fields
+              if (typeof rawPlace.fetchFields === 'function' && !rawPlace.location) {
+                 await rawPlace.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+              }
+              const place = rawPlace;
               setManualData((prev: any) => ({
                 ...prev,
                 address: place.formattedAddress || place.displayName || prev.address || '',
-                lat: place.location ? place.location.lat() : prev.lat,
-                lng: place.location ? place.location.lng() : prev.lng
+                lat: place.location && typeof place.location.lat === 'function' ? place.location.lat() : prev.lat,
+                lng: place.location && typeof place.location.lng === 'function' ? place.location.lng() : prev.lng
               }));
             }
-          });
+          };
+
+          autocomplete.addEventListener('gm-placechange', handlePlaceSelect);
+          autocomplete.addEventListener('gmp-placeselect', handlePlaceSelect);
+          autocomplete.addEventListener('gmp-select', handlePlaceSelect);
 
           container.appendChild(autocomplete);
           
-          // Find the internal input and apply our attributes for 1Password
-          const internalInput = autocomplete.querySelector('input');
-          if (internalInput) {
-            internalInput.setAttribute('data-1p-ignore', 'true');
-            internalInput.placeholder = "Search for an address...";
-            
-            // Sync typed value back to state even if no place is selected
-            internalInput.addEventListener('input', (e: any) => {
-              setManualData((prev: any) => ({ ...prev, address: e.target.value }));
-            });
+          // Listen to bubbling input events from the shadow DOM to sync text
+          autocomplete.addEventListener('input', (e: any) => {
+            const val = e.composedPath?.[0]?.value || e.target.value || e.target.inputValue || '';
+            setManualData((prev: any) => ({ ...prev, address: val }));
+          });
+
+          // Attempt to add 1password ignore if the input is accessible
+          const shadowInput = autocomplete.shadowRoot?.querySelector('input') || autocomplete.querySelector('input');
+          if (shadowInput) {
+            shadowInput.setAttribute('data-1p-ignore', 'true');
+            shadowInput.placeholder = "Type address or search...";
           }
 
           console.log('Modern Autocomplete initialized');
@@ -407,6 +419,7 @@ const Map: React.FC = () => {
   };
 
   const handleManualSubmit = async () => {
+    console.log('handleManualSubmit started, manualData state is:', manualData);
     let dataToSave = { ...manualData };
     
     // Default coordinates check (using 38.0406 as 'missing' indicator)
