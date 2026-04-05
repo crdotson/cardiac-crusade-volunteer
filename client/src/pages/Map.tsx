@@ -246,7 +246,8 @@ const Map: React.FC = () => {
           
           // Listen to bubbling input events from the shadow DOM to sync text
           autocomplete.addEventListener('input', (e: any) => {
-            const val = e.composedPath?.[0]?.value || e.target.value || e.target.inputValue || '';
+            const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+            const val = path[0]?.value || e.target?.value || autocomplete.inputValue || autocomplete.value || '';
             setManualData((prev: any) => ({ ...prev, address: val }));
           });
 
