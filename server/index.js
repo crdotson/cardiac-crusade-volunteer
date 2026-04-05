@@ -1173,6 +1173,7 @@ mainRouter.use((req, res) => {
     const baseHref = BASE_PATH.endsWith('/') ? BASE_PATH : `${BASE_PATH}/`;
     const injection = `<base href="${baseHref}"><script>window.__BASE_PATH__ = "${BASE_PATH}";</script>`;
     indexHtml = indexHtml.replace('<head>', '<head>' + injection);
+    indexHtml = indexHtml.replace('<title>Cardiac Crusade Volunteer App</title>', '<title>Cardiac Crusade Volunteer App v2</title>');
     res.send(indexHtml);
   } catch (err) {
     res.status(500).send('Error loading index.html');
