@@ -962,31 +962,24 @@ mainRouter.post('/api/locations/geocode', authenticateToken, authorizeRoles('App
         const apiKey = keyRes.rows[0]?.value;
         if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
 
-        // Use Places API (New) searchText instead of Geocoding API for better compatibility
-        const response = await axios.post('https://places.googleapis.com/v1/places:searchText', 
-            { 
-                textQuery: address,
-                maxResultCount: 1 
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Goog-Api-Key': apiKey,
-                    'X-Goog-FieldMask': 'places.location,places.formattedAddress,places.displayName'
-                }
+        // Use Geocoding API as requested by the error handler configuration
+        const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+            params: {
+                address: address,
+                key: apiKey
             }
-        );
+        });
 
-        if (!response.data.places || response.data.places.length === 0) {
-            console.error('Google Places SearchText Error: No results for', address);
-            return res.status(400).json({ message: `Could not find location for: ${address}. Google returned no results.` });
+        if (response.data.status !== 'OK' || !response.data.results || response.data.results.length === 0) {
+            console.error('Google Geocoding API Error:', response.data.status, response.data.error_message);
+            return res.status(400).json({ message: `Could not find location for: ${address}. Google returned status: ${response.data.status}.` });
         }
 
-        const place = response.data.places[0];
+        const geo = response.data.results[0];
         res.json({ 
-            lat: place.location.latitude, 
-            lng: place.location.longitude, 
-            formatted_address: place.formattedAddress || place.displayName.text 
+            lat: geo.geometry.location.lat, 
+            lng: geo.geometry.location.lng, 
+            formatted_address: geo.formatted_address 
         });
     } catch (err) {
         console.error('CRITICAL: geocode failure:', JSON.stringify(err.response?.data || err.message));
