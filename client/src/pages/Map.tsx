@@ -171,6 +171,12 @@ const Map: React.FC = () => {
     name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', lat: 38.0406, lng: -84.5037
   });
 
+  const [showDeleteCategory, setShowDeleteCategory] = useState(false);
+  const [deleteCategory, setDeleteCategory] = useState('');
+  const [locationsToDelete, setLocationsToDelete] = useState<any[]>([]);
+  const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<Set<number>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Stable script loader
   useEffect(() => {
     if (settings?.google_api_key && !(window as any).google) {
@@ -448,6 +454,49 @@ const Map: React.FC = () => {
     }
   };
 
+  const handleFindDeleteCategory = () => {
+    if (!deleteCategory) {
+      alert('Please select a category.');
+      return;
+    }
+    const matching = locations.filter(l => l.category === deleteCategory);
+    if (matching.length === 0) {
+      alert('No locations found for this category.');
+      return;
+    }
+    setLocationsToDelete(matching);
+    setSelectedDeleteIndices(new Set(matching.map((_, i) => i)));
+  };
+
+  const toggleDeleteCandidate = (index: number) => {
+    const newSelected = new Set(selectedDeleteIndices);
+    if (newSelected.has(index)) newSelected.delete(index);
+    else newSelected.add(index);
+    setSelectedDeleteIndices(newSelected);
+  };
+
+  const handleBulkDelete = async () => {
+    const idsToDelete = locationsToDelete.filter((_, i) => selectedDeleteIndices.has(i)).map(l => l.id);
+    if (idsToDelete.length === 0) {
+      alert('Please select at least one location to delete.');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete ${idsToDelete.length} locations permanently?`)) {
+      setIsDeleting(true);
+      try {
+        await axios.post('api/locations/bulk-delete', { ids: idsToDelete });
+        alert(`Successfully deleted ${idsToDelete.length} locations.`);
+        setShowDeleteCategory(false);
+        setLocationsToDelete([]);
+        fetchLocations();
+      } catch (err: any) {
+        alert(err.response?.data?.message || 'Bulk delete failed.');
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
   const useMyLocation = () => {
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const { latitude, longitude } = pos.coords;
@@ -523,6 +572,7 @@ const Map: React.FC = () => {
                 <button onClick={() => setShowImport(true)}>Import by Category</button>
                 <button onClick={() => setActiveTool('Circle')}>Import by Area</button>
                 <button onClick={() => setShowManualAdd(true)}>Manually Add</button>
+                <button onClick={() => { setShowDeleteCategory(true); setDeleteCategory(categories[0] || ''); setLocationsToDelete([]); }} style={{ backgroundColor: 'darkred' }}>Delete by Category</button>
               </>
             )}
           </div>
@@ -796,6 +846,59 @@ const Map: React.FC = () => {
               <button onClick={handleManualSubmit} disabled={!manualData.name || !manualData.address}>Add Location</button>
               <button className="secondary" onClick={() => setShowManualAdd(false)}>Cancel</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteCategory && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <button className="close-btn" onClick={() => { setShowDeleteCategory(false); setLocationsToDelete([]); }}>&times;</button>
+            <h3 style={{ color: 'darkred' }}>Bulk Delete by Category</h3>
+            {!locationsToDelete.length ? (
+              <>
+                <div className="form-group">
+                  <label>Select Category to find locations</label>
+                  <select value={deleteCategory} onChange={(e) => setDeleteCategory(e.target.value)}>
+                    <option value="">-- Choose Category --</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <button className="danger" onClick={handleFindDeleteCategory} style={{ backgroundColor: 'darkred' }}>Find Locations</button>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
+                  <span>{selectedDeleteIndices.size} of {locationsToDelete.length} selected for deletion</span>
+                  <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => setSelectedDeleteIndices(new Set())}>Deselect All</button>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #eee', marginBottom: '1rem', borderRadius: '4px' }}>
+                  {locationsToDelete.map((c, i) => (
+                    <div key={c.id} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedDeleteIndices.has(i)} 
+                        onChange={() => toggleDeleteCandidate(i)} 
+                        style={{ width: 'auto' }}
+                      />
+                      <div>
+                        <strong>{c.name}</strong><br />
+                        <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
+                        <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {isDeleting ? (
+                  <p>Deleting... Please wait.</p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button style={{ backgroundColor: 'darkred' }} onClick={handleBulkDelete}>Delete Selected</button>
+                    <button className="secondary" onClick={() => { setShowDeleteCategory(false); setLocationsToDelete([]); }}>Cancel</button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

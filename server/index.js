@@ -782,6 +782,16 @@ mainRouter.delete('/api/locations/:id', authenticateToken, authorizeRoles('Appli
     }
 });
 
+mainRouter.post('/api/locations/bulk-delete', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    try {
+        await pool.query('DELETE FROM locations WHERE id = ANY($1)', [req.body.ids]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 mainRouter.get('/api/locations/:id', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query(`
