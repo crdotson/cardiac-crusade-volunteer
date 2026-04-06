@@ -457,9 +457,11 @@ const Map: React.FC = () => {
 
   const statuses = [
     'Unvisited',
-    'Pending',
-    'AED Located and Mapped at AED.new - Done',
-    'Follow-up Required'
+    'AED status unknown - Follow-up',
+    'AED located and mapped at aed.new - Done',
+    'Refused or requested not to be mapped - Done',
+    'AED located, not mapped yet - Follow up',
+    'AED not present - Done'
   ];
 
   const handleUpdateStatus = async (id: number, status: string) => {
