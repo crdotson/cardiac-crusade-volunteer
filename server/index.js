@@ -886,10 +886,21 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
         const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
         const limit = parseInt(limitRes.rows[0]?.value || '20');
 
+        const broadTypes = [
+            'airport', 'amusement_park', 'aquarium', 'bank', 'bar', 'cafe',
+            'casino', 'church', 'city_hall', 'courthouse', 'dentist', 'doctor',
+            'fire_station', 'gas_station', 'gym', 'hospital', 'library', 'lodging',
+            'medical_clinic', 'movie_theater', 'museum', 'night_club', 'park',
+            'parking', 'police', 'post_office', 'restaurant', 'school', 'shopping_mall',
+            'stadium', 'store', 'supermarket', 'transit_station', 'university',
+            'veterinary_care', 'zoo'
+        ];
+
         const response = await axios.post('https://places.googleapis.com/v1/places:searchNearby', 
             { 
                 locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: radius } },
-                maxResultCount: limit
+                maxResultCount: limit,
+                includedTypes: broadTypes
             },
             {
                 headers: {
