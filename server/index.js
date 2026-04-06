@@ -828,7 +828,8 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
         if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
 
         const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
-        const limit = parseInt(limitRes.rows[0]?.value || '20');
+        const rawLimit = parseInt(limitRes.rows[0]?.value);
+        const limit = isNaN(rawLimit) ? 20 : Math.max(1, Math.min(rawLimit, 20));
 
         const currentLocs = await pool.query('SELECT name, address FROM locations');
         
@@ -884,7 +885,8 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
         if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
 
         const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
-        const limit = parseInt(limitRes.rows[0]?.value || '20');
+        const rawLimit = parseInt(limitRes.rows[0]?.value);
+        const limit = isNaN(rawLimit) ? 20 : Math.max(1, Math.min(rawLimit, 20));
 
         const broadTypes = [
             'airport', 'amusement_park', 'aquarium', 'bank', 'bar', 'cafe',
