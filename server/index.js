@@ -122,12 +122,18 @@ async function initDB() {
       `);
 
       await pool.query(`
-        CREATE TABLE IF NOT EXISTS assignments (
+        CREATE TABLE IF NOT EXISTS grid_squares (
           id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id),
-          geom JSONB NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          north DOUBLE PRECISION NOT NULL,
+          south DOUBLE PRECISION NOT NULL,
+          east DOUBLE PRECISION NOT NULL,
+          west DOUBLE PRECISION NOT NULL,
+          assigned_volunteer_id INTEGER REFERENCES users(id)
         );
+      `);
+
+      await pool.query(`
+        DROP TABLE IF EXISTS assignments;
       `);
       
       const adminEmail = 'chris@dotson97.org';
@@ -761,9 +767,25 @@ mainRouter.get('/api/locations', authenticateToken, async (req, res) => {
 mainRouter.post('/api/locations', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { name, address, lat, lng, phone, category, assigned_volunteer_id, status } = req.body;
     try {
+        let finalVolunteerId = assigned_volunteer_id || null;
+        let finalAssignmentType = assigned_volunteer_id ? 'Manual' : null;
+
+        if (!assigned_volunteer_id) {
+            // Auto calculate grid
+            const gridRes = await pool.query(`
+                SELECT assigned_volunteer_id FROM grid_squares
+                WHERE $1 <= north AND $1 >= south AND $2 <= east AND $2 >= west
+                AND assigned_volunteer_id IS NOT NULL LIMIT 1
+            `, [lat, lng]);
+            if (gridRes.rows.length > 0) {
+                finalVolunteerId = gridRes.rows[0].assigned_volunteer_id;
+                finalAssignmentType = 'Grid';
+            }
+        }
+
         const result = await pool.query(
             'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
-            [name, address, lat, lng, phone, category, status || 'Unvisited', assigned_volunteer_id || null, assigned_volunteer_id ? 'Manual' : null]
+            [name, address, lat, lng, phone, category, status || 'Unvisited', finalVolunteerId, finalAssignmentType]
         );
         res.json(result.rows[0]);
     } catch (err) {
@@ -1011,31 +1033,91 @@ mainRouter.post('/api/locations/geocode', authenticateToken, authorizeRoles('App
     }
 });
 
-mainRouter.post('/api/assignments/area', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
-    const { volunteerId, bounds } = req.body; // bounds: { _northEast: {lat, lng}, _southWest: {lat, lng} }
-    const assignedBy = req.user.id;
 
+mainRouter.get('/api/grids', authenticateToken, async (req, res) => {
     try {
-        const { _northEast, _southWest } = bounds;
-        
-        // Update locations within bounds
-        const updateRes = await pool.query(`
-            UPDATE locations 
-            SET assigned_volunteer_id = $1, assigned_by_id = $2, assignment_type = 'Area' 
-            WHERE lat <= $3 AND lat >= $4 AND lng <= $5 AND lng >= $6
-            AND (assigned_volunteer_id IS NULL OR assignment_type = 'Area')
-            RETURNING id
-        `, [volunteerId, assignedBy, _northEast.lat, _southWest.lat, _northEast.lng, _southWest.lng]);
-
-        // Save assignment geometry
-        await pool.query('INSERT INTO assignments (user_id, geom) VALUES ($1, $2)', [volunteerId, JSON.stringify(bounds)]);
-
-        res.json({ assignedCount: updateRes.rowCount });
+        const result = await pool.query(`
+            SELECT g.*, u.email as assigned_volunteer_email 
+            FROM grid_squares g 
+            LEFT JOIN users u ON g.assigned_volunteer_id = u.id
+        `);
+        res.json(result.rows);
     } catch (err) {
         console.error('Error in route:', req.path, err);
         res.status(500).json({ error: err.message });
     }
 });
+
+mainRouter.post('/api/grids/generate', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    const { bounds, gridSizeMiles } = req.body;
+    try {
+        const { _northEast, _southWest } = bounds;
+        const latDegrees = gridSizeMiles / 69.0;
+        const lngDegrees = gridSizeMiles / 54.6; // approx for scaling
+        
+        let startLat = _southWest.lat;
+        let queries = [];
+        
+        while (startLat < _northEast.lat) {
+            let startLng = _southWest.lng;
+            let endLat = startLat + latDegrees;
+            
+            while (startLng < _northEast.lng) {
+                let endLng = startLng + lngDegrees;
+                queries.push(pool.query(
+                    'INSERT INTO grid_squares (north, south, east, west) VALUES ($1, $2, $3, $4)',
+                    [endLat, startLat, endLng, startLng]
+                ));
+                startLng = endLng;
+            }
+            startLat = endLat;
+        }
+        
+        await Promise.all(queries);
+        res.json({ success: true, count: queries.length });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+mainRouter.post('/api/grids/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+    const { volunteerId } = req.body;
+    const gridId = req.params.id;
+    try {
+        // Update Grid Owner
+        await pool.query('UPDATE grid_squares SET assigned_volunteer_id = $1 WHERE id = $2', [volunteerId, gridId]);
+        
+        // Dynamic cascading update to locations in the grid that are NOT manually assigned
+        if (volunteerId) {
+            const gridRes = await pool.query('SELECT * FROM grid_squares WHERE id = $1', [gridId]);
+            if (gridRes.rows.length === 0) return res.status(404).json({ message: 'Grid not found' });
+            const g = gridRes.rows[0];
+            await pool.query(`
+                UPDATE locations 
+                SET assigned_volunteer_id = $1, assignment_type = 'Grid' 
+                WHERE lat <= $2 AND lat >= $3 AND lng <= $4 AND lng >= $5
+                AND (assignment_type IS NULL OR assignment_type != 'Manual')
+            `, [volunteerId, g.north, g.south, g.east, g.west]);
+        } else {
+            // Unassigning grid: remove grid assignments from locations in this grid
+            const gridRes = await pool.query('SELECT * FROM grid_squares WHERE id = $1', [gridId]);
+            if (gridRes.rows.length === 0) return res.status(404).json({ message: 'Grid not found' });
+            const g = gridRes.rows[0];
+            await pool.query(`
+                UPDATE locations 
+                SET assigned_volunteer_id = NULL, assignment_type = NULL
+                WHERE lat <= $1 AND lat >= $2 AND lng <= $3 AND lng >= $4
+                AND assignment_type = 'Grid'
+            `, [g.north, g.south, g.east, g.west]);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 mainRouter.get('/api/users/assignable', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
     try {
@@ -1106,15 +1188,7 @@ mainRouter.post('/api/locations/:id/assign', authenticateToken, authorizeRoles('
     }
 });
 
-mainRouter.get('/api/assignments/:userId', authenticateToken, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM assignments WHERE user_id = $1', [req.params.userId]);
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Error in get assignments route:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
+
 
 // --- Reporting (Phase 5) ---
 

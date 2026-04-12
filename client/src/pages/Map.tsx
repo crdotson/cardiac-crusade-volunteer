@@ -80,10 +80,9 @@ const formatCategoryName = (name: string) => {
   }
 };
 
-const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTool, onToolEnabled }: { 
+const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }: { 
   onDrawCreated: (bounds: L.LatLngBounds) => void, 
   onCircleCreated: (center: L.LatLng, radius: number) => void,
-  selectedVolunteer: string,
   activeTool: string | null,
   onToolEnabled: (tool: string | null) => void
 }) => {
@@ -93,7 +92,7 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTo
     if (activeTool === 'Circle') {
       map.pm.enableDraw('Circle');
       onToolEnabled(null);
-    } else if (activeTool === 'Rectangle') {
+    } else if (activeTool === 'MasterRectangle') {
       map.pm.enableDraw('Rectangle');
       onToolEnabled(null);
     }
@@ -116,10 +115,7 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTo
     });
 
     map.on('pm:drawstart', (e: any) => {
-      if ((e.shape === 'Rectangle' || e.shape === 'Circle') && !selectedVolunteer) {
-        alert('Please select a volunteer first.');
-        map.pm.disableDraw();
-      }
+      // Freely allow drawing
     });
 
     map.on('pm:create', (e: any) => {
@@ -140,7 +136,7 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, selectedVolunteer, activeTo
       map.off('pm:create');
       map.off('pm:drawstart');
     };
-  }, [map, onDrawCreated, selectedVolunteer]);
+  }, [map, onDrawCreated]);
 
   return null;
 };
@@ -150,7 +146,7 @@ const Map: React.FC = () => {
   const [locations, setLocations] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [selectedVolunteer, setSelectedVolunteer] = useState<string>('');
-  const [userAssignments, setUserAssignments] = useState<any[]>([]);
+  const [grids, setGrids] = useState<any[]>([]);
   const [showImport, setShowImport] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -313,44 +309,31 @@ const Map: React.FC = () => {
     }
   };
 
+  const fetchGrids = async () => {
+    try {
+      const res = await axios.get('api/grids');
+      setGrids(res.data);
+    } catch (err) {
+      console.error('Failed to fetch grids', err);
+    }
+  };
+
   useEffect(() => {
     fetchLocations();
     fetchVolunteers();
     fetchCategories();
     fetchSettings();
+    fetchGrids();
   }, [user]);
 
-  useEffect(() => {
-    if (selectedVolunteer) {
-      axios.get(`api/assignments/${selectedVolunteer}`).then(res => {
-        setUserAssignments(res.data);
-      }).catch(err => {
-        console.error('Failed to fetch user assignments', err);
-      });
-    } else {
-      setUserAssignments([]);
-    }
-  }, [selectedVolunteer]);
-
-  const handleAreaAssignment = async (bounds: L.LatLngBounds) => {
-    if (!selectedVolunteer) {
-      alert('Please select a volunteer first.');
-      return;
-    }
-
+  const handleGridAreaCreated = async (bounds: L.LatLngBounds) => {
+    const sizeStr = prompt("Enter grid square size in miles", "0.25");
+    if (!sizeStr) return;
     try {
-      const res = await axios.post('api/assignments/area', {
-        volunteerId: selectedVolunteer,
-        bounds: bounds
-      });
-      alert(`Assigned ${res.data.assignedCount} locations.`);
-      fetchLocations();
-      // Refetch assignments for the current volunteer to show the new rectangle
-      const assignRes = await axios.get(`api/assignments/${selectedVolunteer}`);
-      setUserAssignments(assignRes.data);
+        await axios.post('api/grids/generate', { bounds, gridSizeMiles: parseFloat(sizeStr) });
+        fetchGrids();
     } catch (err) {
-      console.error('Failed to assign locations', err);
-      alert('Failed to assign locations.');
+        console.error('Failed to generate grids', err);
     }
   };
 
@@ -573,6 +556,7 @@ const Map: React.FC = () => {
                 <button onClick={() => setActiveTool('Circle')}>Import by Area</button>
                 <button onClick={() => setShowManualAdd(true)}>Manually Add</button>
                 <button onClick={() => { setShowDeleteCategory(true); setDeleteCategory(categories[0] || ''); setLocationsToDelete([]); }} style={{ backgroundColor: 'darkred' }}>Delete by Category</button>
+                <button onClick={() => setActiveTool('MasterRectangle')} style={{ backgroundColor: 'purple' }}>Generate Grid Area</button>
               </>
             )}
           </div>
@@ -583,11 +567,7 @@ const Map: React.FC = () => {
                 <label style={{ whiteSpace: 'nowrap' }}>Assign to:</label>
                 <select 
                   value={selectedVolunteer} 
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedVolunteer(val);
-                    if (val) setActiveTool('Rectangle');
-                  }} 
+                  onChange={(e) => setSelectedVolunteer(e.target.value)} 
                   style={{ marginBottom: 0 }}
                 >
                   <option value="">Select Volunteer</option>
@@ -595,7 +575,7 @@ const Map: React.FC = () => {
                     <option key={v.id} value={v.id}>{v.email} ({v.role})</option>
                   ))}
                 </select>
-                <span style={{ fontSize: '0.8rem', color: '#666', whiteSpace: 'nowrap' }}>Draw rectangle to assign</span>
+                <span style={{ fontSize: '0.8rem', color: '#666', whiteSpace: 'nowrap' }}>Click a grid square to assign</span>
               </div>
             )}
           </div>
@@ -608,12 +588,32 @@ const Map: React.FC = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {userAssignments.map((assign, i) => (
+          {grids.map((grid) => (
             <Rectangle 
-              key={i} 
-              bounds={[[assign.geom._southWest.lat, assign.geom._southWest.lng], [assign.geom._northEast.lat, assign.geom._northEast.lng]]}
-              pathOptions={{ color: 'red', fillOpacity: 0.1 }}
-            />
+              key={grid.id} 
+              bounds={[[grid.south, grid.west], [grid.north, grid.east]]}
+              pathOptions={{ 
+                 color: grid.assigned_volunteer_id ? 'blue' : 'gray', 
+                 fillOpacity: grid.assigned_volunteer_id ? 0.3 : 0.1,
+                 weight: 1
+              }}
+              eventHandlers={{
+                 click: async () => {
+                     const targetVolunteer = (['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '')) ? selectedVolunteer : user?.id;
+                     try {
+                         await axios.post(`api/grids/${grid.id}/assign`, { volunteerId: targetVolunteer || null });
+                         fetchGrids();
+                         fetchLocations();
+                     } catch(err) { 
+                         console.error('Failed to assign grid', err); 
+                     }
+                 }
+              }}
+            >
+              {(grid.assigned_volunteer_email || grid.assigned_volunteer_id) && (
+                 <Popup>{grid.assigned_volunteer_email || 'Assigned'}</Popup>
+              )}
+            </Rectangle>
           ))}
           {locations.map(loc => {
             const isAssignedToSelected = selectedVolunteer && Number(loc.assigned_volunteer_id) === Number(selectedVolunteer);
@@ -690,9 +690,8 @@ const Map: React.FC = () => {
             );
           })}
           <MapEvents 
-            onDrawCreated={handleAreaAssignment} 
+            onDrawCreated={handleGridAreaCreated} 
             onCircleCreated={handleCircleCreated}
-            selectedVolunteer={selectedVolunteer} 
             activeTool={activeTool}
             onToolEnabled={setActiveTool}
           />
