@@ -110,15 +110,15 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }
       position: 'topleft',
       drawCircleMarker: false,
       drawPolyline: false,
-      drawRectangle: true,
+      drawRectangle: false,
       drawPolygon: false,
-      drawCircle: true,
+      drawCircle: false,
       drawMarker: false,
       drawText: false,
       cutPolygon: false,
-      editMode: true,
-      dragMode: true,
-      removalMode: true,
+      editMode: false,
+      dragMode: false,
+      removalMode: false,
     });
 
     map.on('pm:drawstart', () => {
@@ -130,8 +130,7 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }
         const layer = e.layer;
         const bounds = layer.getBounds();
         handleDrawRef.current(bounds);
-        // Optionally remove the layer after capturing bounds if we don't want it to stay
-        // layer.remove(); 
+        e.layer.remove();
       } else if (e.shape === 'Circle') {
         handleCircleRef.current(e.layer.getLatLng(), e.layer.getRadius());
         e.layer.remove(); // Remove temporary circle after search
@@ -341,6 +340,15 @@ const Map: React.FC = () => {
 
   const handleGridAreaCreated = async (bounds: L.LatLngBounds) => {
     setGridPromptBounds(bounds);
+  };
+
+  const handleGenerateGridClick = () => {
+    if (grids.length > 0) {
+      if (!window.confirm("Are you sure?  This will remove the grid and all grid assignments.")) {
+        return;
+      }
+    }
+    setActiveTool('MasterRectangle');
   };
 
   const handleConfirmGridGeneration = async () => {
@@ -583,7 +591,7 @@ const Map: React.FC = () => {
                 <button onClick={() => setActiveTool('Circle')}>Import by Area</button>
                 <button onClick={() => setShowManualAdd(true)}>Manually Add</button>
                 <button onClick={() => { setShowDeleteCategory(true); setDeleteCategory(categories[0] || ''); setLocationsToDelete([]); }} style={{ backgroundColor: 'darkred' }}>Delete by Category</button>
-                <button onClick={() => setActiveTool('MasterRectangle')} style={{ backgroundColor: 'purple' }}>Generate Grid Area</button>
+                <button onClick={handleGenerateGridClick} style={{ backgroundColor: 'purple' }}>Generate Grid Area</button>
               </>
             )}
           </div>

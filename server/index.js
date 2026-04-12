@@ -1051,6 +1051,9 @@ mainRouter.get('/api/grids', authenticateToken, async (req, res) => {
 mainRouter.post('/api/grids/generate', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { bounds, gridSizeMiles } = req.body;
     try {
+        await pool.query("UPDATE locations SET assigned_volunteer_id = NULL, assignment_type = NULL WHERE assignment_type = 'Grid'");
+        await pool.query("DELETE FROM grid_squares");
+
         const { _northEast, _southWest } = bounds;
         const latDegrees = gridSizeMiles / 69.0;
         const lngDegrees = gridSizeMiles / 54.6; // approx for scaling
