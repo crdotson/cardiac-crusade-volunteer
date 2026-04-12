@@ -114,7 +114,7 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }
       removalMode: true,
     });
 
-    map.on('pm:drawstart', (e: any) => {
+    map.on('pm:drawstart', () => {
       // Freely allow drawing
     });
 
