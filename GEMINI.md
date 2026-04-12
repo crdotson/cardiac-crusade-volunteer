@@ -37,3 +37,20 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 1. **Committing Changes**: When asked to commit changes, always run `git status` to inspect each changed file. Ensure you clean up by removing any unneeded/temporary files and only add/commit the files that are necessary.
 2. **Build Verification**: After making edits, always run an npm build (e.g. `npm run build` in the `client` directory) to verify that there are no compilation errors and ensure that the Dockerfile will successfully build in CI.
 3. **Sandbox Limitations**: Note that the agent is running in an isolated sandbox. Actions that require external git credentials (like `git push`), an interactive local Docker daemon (`docker build`), or similar local system privileges will not work. Be sure to inform the user when these limits are encountered so they can perform the action themselves.
+4. **Project Log**: After each commit, update the project notes with any changes made and any difficulties encountered so that future sessions can avoid those difficulties.
+
+## Recent Changes & Learnings
+
+### Session: Grid Generation & Google API Pagination
+**Changes Made:**
+1. **Grid UI:** Replaced the native Javascript `prompt()` with a custom React modal for grid size generation, as browsers silently block `prompt()` within complex React workflows.
+2. **Geoman Listeners:** Modified `MapEvents.tsx` to handle `pm:create` events using `useRef` rather than putting dependencies in the `useEffect` array, preventing Leaflet-Geoman's listener dropping drawing events.
+3. **Map UX:** Configured Geoman to instantly clear shape layers (`e.layer.remove()`) after yielding their bounds. Replaced the "Import by Area" Tool from `Circle` to `Rectangle`. Visually hid all default Geoman toolbar buttons (`drawRectangle: false`) to keep the interface clean while retaining programmatic drawing functionality.
+4. **Grid Wipe Protocol:** Adjusted the generated grid endpoint to require user confirmation, then reliably wipe existing grids and decouple current assignment IDs from the database before replacement.
+5. **Pagination Architecture:** Re-wrote Google API calls (`/api/locations/search` & `/api/locations/search-nearby`) to feature `while` loops that natively negotiate `nextPageToken` properties up to the database's `google_places_limit`. "Import by Area" API converted entirely to `searchText` employing `locationRestriction.rectangle` bounding constraints.
+
+**Difficulties Encountered:**
+- **Places API "New" Limitations:** The modern `searchNearby` API endpoint strictly defaults to a maximum 20 results and absolutely does not support pagination tokens. It also severely restricts multiple-category queries. 
+- **Legacy Trade-offs:** Avoid Legacy Google API endpoints (`maps/api/place/nearbysearch/*`) due to loss of phone numbers and enforced 2-second timeout suspensions required between page tokens.
+- **Solution:** Always utilize the **New `searchText`** endpoint which accepts `pageToken` and geographic limits (`locationRestriction`). This maintains response speed and robust metadata while simulating Area searches precisely.
+- **React Effect Unmounting:** Integrating leaflet/geoman drawing controls straight into React `useEffect` structures creates fatal sync issues. Always decouple the active configuration into refs `useRef()` that safely proxy events to avoid detachments mid-draw!
