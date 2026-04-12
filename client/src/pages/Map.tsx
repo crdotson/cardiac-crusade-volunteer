@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Rectangle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -87,6 +87,13 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }
   onToolEnabled: (tool: string | null) => void
 }) => {
   const map = useMap();
+  const handleDrawRef = useRef(onDrawCreated);
+  const handleCircleRef = useRef(onCircleCreated);
+
+  useEffect(() => {
+    handleDrawRef.current = onDrawCreated;
+    handleCircleRef.current = onCircleCreated;
+  }, [onDrawCreated, onCircleCreated]);
 
   useEffect(() => {
     if (activeTool === 'Circle') {
@@ -118,25 +125,27 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }
       // Freely allow drawing
     });
 
-    map.on('pm:create', (e: any) => {
-      if (e.shape === 'Rectangle') {
+    const handleCreate = (e: any) => {
+      if (e.shape === 'Rectangle' || e.shape === 'Polygon') {
         const layer = e.layer;
         const bounds = layer.getBounds();
-        onDrawCreated(bounds);
+        handleDrawRef.current(bounds);
         // Optionally remove the layer after capturing bounds if we don't want it to stay
         // layer.remove(); 
       } else if (e.shape === 'Circle') {
-        onCircleCreated(e.layer.getLatLng(), e.layer.getRadius());
+        handleCircleRef.current(e.layer.getLatLng(), e.layer.getRadius());
         e.layer.remove(); // Remove temporary circle after search
       }
-    });
+    };
+
+    map.on('pm:create', handleCreate);
 
     return () => {
       map.pm.removeControls();
-      map.off('pm:create');
+      map.off('pm:create', handleCreate);
       map.off('pm:drawstart');
     };
-  }, [map, onDrawCreated]);
+  }, [map]);
 
   return null;
 };
@@ -161,6 +170,10 @@ const Map: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [settings, setSettings] = useState<any>(null);
   const [isGoogleLoaded, setIsGoogleLoaded] = useState(!!(window as any).google);
+  
+  const [gridPromptBounds, setGridPromptBounds] = useState<L.LatLngBounds | null>(null);
+  const [gridSizeInput, setGridSizeInput] = useState<string>('0.25');
+  const [isGeneratingGrid, setIsGeneratingGrid] = useState(false);
 
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [manualData, setManualData] = useState<any>({
@@ -327,19 +340,27 @@ const Map: React.FC = () => {
   }, [user]);
 
   const handleGridAreaCreated = async (bounds: L.LatLngBounds) => {
-    const sizeStr = prompt("Enter grid square size in miles", "0.25");
-    if (!sizeStr) return;
+    setGridPromptBounds(bounds);
+  };
+
+  const handleConfirmGridGeneration = async () => {
+    if (!gridPromptBounds || !gridSizeInput) return;
+    setIsGeneratingGrid(true);
     try {
-        const sw = bounds.getSouthWest();
-        const ne = bounds.getNorthEast();
+        const sw = gridPromptBounds.getSouthWest();
+        const ne = gridPromptBounds.getNorthEast();
         const payloadBounds = {
             _southWest: { lat: sw.lat, lng: sw.lng },
             _northEast: { lat: ne.lat, lng: ne.lng }
         };
-        await axios.post('api/grids/generate', { bounds: payloadBounds, gridSizeMiles: parseFloat(sizeStr) });
+        await axios.post('api/grids/generate', { bounds: payloadBounds, gridSizeMiles: parseFloat(gridSizeInput) });
         fetchGrids();
+        setGridPromptBounds(null);
     } catch (err) {
         console.error('Failed to generate grids', err);
+        alert('Failed to generate grids. Check console for details.');
+    } finally {
+        setIsGeneratingGrid(false);
     }
   };
 
@@ -851,6 +872,34 @@ const Map: React.FC = () => {
               <button onClick={handleManualSubmit} disabled={!manualData.name || !manualData.address}>Add Location</button>
               <button className="secondary" onClick={() => setShowManualAdd(false)}>Cancel</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {gridPromptBounds && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '400px' }}>
+            <button className="close-btn" onClick={() => setGridPromptBounds(null)}>&times;</button>
+            <h3>Generate Grid Squares</h3>
+            <p>Enter the desired size of each grid square in miles.</p>
+            <div className="form-group">
+              <label>Grid Square Size (Miles)</label>
+              <input 
+                type="number" 
+                step="0.05"
+                min="0.05"
+                value={gridSizeInput} 
+                onChange={(e) => setGridSizeInput(e.target.value)} 
+              />
+            </div>
+            {isGeneratingGrid ? (
+              <p>Generating... Please wait.</p>
+            ) : (
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button onClick={handleConfirmGridGeneration}>Generate Grids</button>
+                <button className="secondary" onClick={() => setGridPromptBounds(null)}>Cancel</button>
+              </div>
+            )}
           </div>
         </div>
       )}
