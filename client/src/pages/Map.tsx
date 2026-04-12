@@ -330,7 +330,13 @@ const Map: React.FC = () => {
     const sizeStr = prompt("Enter grid square size in miles", "0.25");
     if (!sizeStr) return;
     try {
-        await axios.post('api/grids/generate', { bounds, gridSizeMiles: parseFloat(sizeStr) });
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
+        const payloadBounds = {
+            _southWest: { lat: sw.lat, lng: sw.lng },
+            _northEast: { lat: ne.lat, lng: ne.lng }
+        };
+        await axios.post('api/grids/generate', { bounds: payloadBounds, gridSizeMiles: parseFloat(sizeStr) });
         fetchGrids();
     } catch (err) {
         console.error('Failed to generate grids', err);

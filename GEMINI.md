@@ -32,3 +32,8 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 ## Operational Notes
 - The application is now **path-agnostic**, but for the test deployment, it is mounted at the root of the `test-cardiaccrusade.dotson97.org` subdomain.
 - Future changes to the deployment structure (e.g., adding environment variables) should be made in the `git-update-manifest` Tekton Task script.
+
+## AI Agent Guidelines
+1. **Committing Changes**: When asked to commit changes, always run `git status` to inspect each changed file. Ensure you clean up by removing any unneeded/temporary files and only add/commit the files that are necessary.
+2. **Build Verification**: After making edits, always run an npm build (e.g. `npm run build` in the `client` directory) to verify that there are no compilation errors and ensure that the Dockerfile will successfully build in CI.
+3. **Sandbox Limitations**: Note that the agent is running in an isolated sandbox. Actions that require external git credentials (like `git push`), an interactive local Docker daemon (`docker build`), or similar local system privileges will not work. Be sure to inform the user when these limits are encountered so they can perform the action themselves.
