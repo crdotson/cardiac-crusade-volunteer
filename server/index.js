@@ -861,30 +861,45 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
 
         const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
         const rawLimit = parseInt(limitRes.rows[0]?.value);
-        const limit = isNaN(rawLimit) ? 20 : Math.max(1, Math.min(rawLimit, 20));
+        const targetLimit = isNaN(rawLimit) ? 20 : Math.max(1, rawLimit);
 
         const currentLocs = await pool.query('SELECT name, address FROM locations');
-        
         const query = `${category} in ${city}`;
-        const response = await axios.post('https://places.googleapis.com/v1/places:searchText', 
-            { textQuery: query, maxResultCount: limit },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Goog-Api-Key': apiKey,
-                    'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber'
-                }
-            }
-        );
 
-        const results = response.data.places || [];
+        let allResults = [];
+        let pageToken = '';
+        const pageSize = 20;
+
+        while (allResults.length < targetLimit) {
+            const currentLimit = Math.min(pageSize, targetLimit - allResults.length);
+            const payload = { textQuery: query, pageSize: currentLimit };
+            if (pageToken) payload.pageToken = pageToken;
+
+            const response = await axios.post('https://places.googleapis.com/v1/places:searchText', 
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': apiKey,
+                        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,nextPageToken'
+                    }
+                }
+            );
+
+            const places = response.data.places || [];
+            allResults = allResults.concat(places);
+
+            pageToken = response.data.nextPageToken;
+            if (!pageToken || places.length === 0) break;
+        }
+
         const candidates = [];
 
-        for (const place of results) {
-            const name = place.displayName.text;
-            const address = place.formattedAddress;
-            const lat = place.location.latitude;
-            const lng = place.location.longitude;
+        for (const place of allResults) {
+            const name = place.displayName?.text || 'Unknown';
+            const address = place.formattedAddress || 'No Address';
+            const lat = place.location?.latitude;
+            const lng = place.location?.longitude;
             const phone = place.internationalPhoneNumber || null;
 
             let isDuplicate = false;
@@ -910,7 +925,7 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
 });
 
 mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
-    const { lat, lng, radius } = req.body; // radius in meters
+    const { bounds } = req.body;
     try {
         const keyRes = await pool.query("SELECT value FROM settings WHERE key = 'google_api_key'");
         const apiKey = keyRes.rows[0]?.value;
@@ -918,34 +933,45 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
 
         const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
         const rawLimit = parseInt(limitRes.rows[0]?.value);
-        const limit = isNaN(rawLimit) ? 20 : Math.max(1, Math.min(rawLimit, 20));
+        const targetLimit = isNaN(rawLimit) ? 20 : Math.max(1, rawLimit);
 
-        const broadTypes = [
-            'airport', 'amusement_park', 'aquarium', 'bank', 'bar', 'cafe',
-            'casino', 'church', 'city_hall', 'courthouse', 'dentist', 'doctor',
-            'fire_station', 'gas_station', 'gym', 'hospital', 'library', 'lodging',
-            'medical_clinic', 'movie_theater', 'museum', 'night_club', 'park',
-            'parking', 'police', 'post_office', 'restaurant', 'school', 'shopping_mall',
-            'stadium', 'store', 'supermarket', 'transit_station', 'university',
-            'veterinary_care', 'zoo'
-        ];
+        let allResults = [];
+        let pageToken = '';
+        const pageSize = 20;
 
-        const response = await axios.post('https://places.googleapis.com/v1/places:searchNearby', 
-            { 
-                locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: radius } },
-                maxResultCount: limit,
-                includedTypes: broadTypes
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Goog-Api-Key': apiKey,
-                    'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.types'
+        while (allResults.length < targetLimit) {
+            const currentLimit = Math.min(pageSize, targetLimit - allResults.length);
+            const payload = { 
+                textQuery: "business", 
+                pageSize: currentLimit,
+                locationRestriction: {
+                    rectangle: {
+                        low: { latitude: bounds._southWest.lat, longitude: bounds._southWest.lng },
+                        high: { latitude: bounds._northEast.lat, longitude: bounds._northEast.lng }
+                    }
                 }
-            }
-        );
+            };
+            if (pageToken) payload.pageToken = pageToken;
 
-        const results = (response.data.places || []).map(p => ({
+            const response = await axios.post('https://places.googleapis.com/v1/places:searchText', 
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': apiKey,
+                        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.types,nextPageToken'
+                    }
+                }
+            );
+
+            const places = response.data.places || [];
+            allResults = allResults.concat(places);
+
+            pageToken = response.data.nextPageToken;
+            if (!pageToken || places.length === 0) break;
+        }
+
+        const results = allResults.map(p => ({
             name: p.displayName?.text || 'Unknown',
             address: p.formattedAddress || 'No Address',
             lat: p.location?.latitude,

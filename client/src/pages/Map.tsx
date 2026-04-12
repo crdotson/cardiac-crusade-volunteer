@@ -80,26 +80,29 @@ const formatCategoryName = (name: string) => {
   }
 };
 
-const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }: { 
+const MapEvents = ({ onDrawCreated, onImportAreaCreated, activeTool, onToolEnabled }: { 
   onDrawCreated: (bounds: L.LatLngBounds) => void, 
-  onCircleCreated: (center: L.LatLng, radius: number) => void,
+  onImportAreaCreated: (bounds: L.LatLngBounds) => void,
   activeTool: string | null,
   onToolEnabled: (tool: string | null) => void
 }) => {
   const map = useMap();
   const handleDrawRef = useRef(onDrawCreated);
-  const handleCircleRef = useRef(onCircleCreated);
+  const handleImportRef = useRef(onImportAreaCreated);
+  const lastRectangleToolRef = useRef<string>('MasterRectangle');
 
   useEffect(() => {
     handleDrawRef.current = onDrawCreated;
-    handleCircleRef.current = onCircleCreated;
-  }, [onDrawCreated, onCircleCreated]);
+    handleImportRef.current = onImportAreaCreated;
+  }, [onDrawCreated, onImportAreaCreated]);
 
   useEffect(() => {
-    if (activeTool === 'Circle') {
-      map.pm.enableDraw('Circle');
+    if (activeTool === 'ImportRectangle') {
+      lastRectangleToolRef.current = 'ImportRectangle';
+      map.pm.enableDraw('Rectangle');
       onToolEnabled(null);
     } else if (activeTool === 'MasterRectangle') {
+      lastRectangleToolRef.current = 'MasterRectangle';
       map.pm.enableDraw('Rectangle');
       onToolEnabled(null);
     }
@@ -129,11 +132,12 @@ const MapEvents = ({ onDrawCreated, onCircleCreated, activeTool, onToolEnabled }
       if (e.shape === 'Rectangle' || e.shape === 'Polygon') {
         const layer = e.layer;
         const bounds = layer.getBounds();
-        handleDrawRef.current(bounds);
+        if (lastRectangleToolRef.current === 'ImportRectangle') {
+          handleImportRef.current(bounds);
+        } else {
+          handleDrawRef.current(bounds);
+        }
         e.layer.remove();
-      } else if (e.shape === 'Circle') {
-        handleCircleRef.current(e.layer.getLatLng(), e.layer.getRadius());
-        e.layer.remove(); // Remove temporary circle after search
       }
     };
 
@@ -372,15 +376,19 @@ const Map: React.FC = () => {
     }
   };
 
-  const handleCircleCreated = async (center: L.LatLng, radius: number) => {
+  const handleImportAreaCreated = async (bounds: L.LatLngBounds) => {
     setIsImporting(true);
     setShowImport(true); // Open the unified modal
     setCandidates([]);
     try {
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      const payloadBounds = {
+          _southWest: { lat: sw.lat, lng: sw.lng },
+          _northEast: { lat: ne.lat, lng: ne.lng }
+      };
       const res = await axios.post('api/locations/search-nearby', {
-        lat: center.lat,
-        lng: center.lng,
-        radius: radius
+        bounds: payloadBounds
       });
       setCandidates(res.data);
       setSelectedCandidates(new Set(res.data.map((_: any, i: number) => i)));
@@ -588,7 +596,7 @@ const Map: React.FC = () => {
             {['Application Administrator', 'City Coordinator'].includes(user?.role || '') && (
               <>
                 <button onClick={() => setShowImport(true)}>Import by Category</button>
-                <button onClick={() => setActiveTool('Circle')}>Import by Area</button>
+                <button onClick={() => setActiveTool('ImportRectangle')}>Import by Area</button>
                 <button onClick={() => setShowManualAdd(true)}>Manually Add</button>
                 <button onClick={() => { setShowDeleteCategory(true); setDeleteCategory(categories[0] || ''); setLocationsToDelete([]); }} style={{ backgroundColor: 'darkred' }}>Delete by Category</button>
                 <button onClick={handleGenerateGridClick} style={{ backgroundColor: 'purple' }}>Generate Grid Area</button>
@@ -726,7 +734,7 @@ const Map: React.FC = () => {
           })}
           <MapEvents 
             onDrawCreated={handleGridAreaCreated} 
-            onCircleCreated={handleCircleCreated}
+            onImportAreaCreated={handleImportAreaCreated}
             activeTool={activeTool}
             onToolEnabled={setActiveTool}
           />
