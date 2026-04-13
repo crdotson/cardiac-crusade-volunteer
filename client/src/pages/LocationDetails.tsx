@@ -5,11 +5,7 @@ import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 
 const getPulsePointLink = () => {
-    const ua = navigator.userAgent;
-    if (/iPad|iPhone|iPod/.test(ua)) {
-        return "https://apps.apple.com/us/app/pulsepoint-aed/id867150971";
-    }
-    return "https://play.google.com/store/apps/details?id=org.pulsepoint.aeds.android&hl=en_US";
+    return "https://aedviewer.pulsepoint.org";
 };
 
 const LocationDetails: React.FC = () => {
