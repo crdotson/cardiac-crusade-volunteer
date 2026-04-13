@@ -670,6 +670,13 @@ const Map: React.FC = () => {
               eventHandlers={{
                  click: async () => {
                      const isPrivileged = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
+                     
+                     if (!isPrivileged) {
+                         if (grid.assigned_volunteer_id && String(grid.assigned_volunteer_id) !== String(user?.id)) {
+                             return; // Grid is owned by someone else; do nothing.
+                         }
+                     }
+
                      const targetVolunteer = isPrivileged 
                         ? selectedVolunteer 
                         : (String(grid.assigned_volunteer_id) === String(user?.id) ? null : user?.id);

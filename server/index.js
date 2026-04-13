@@ -1120,6 +1120,12 @@ mainRouter.post('/api/grids/:id/assign', authenticateToken, authorizeRoles('Appl
             if (volunteerId !== null && String(volunteerId) !== String(req.user.id)) {
                  return res.status(403).json({ message: 'Volunteers can only assign grid squares to themselves.' });
             }
+            if (volunteerId !== null) {
+                const checkRes = await pool.query('SELECT assigned_volunteer_id FROM grid_squares WHERE id = $1', [gridId]);
+                if (checkRes.rows.length > 0 && checkRes.rows[0].assigned_volunteer_id && String(checkRes.rows[0].assigned_volunteer_id) !== String(req.user.id)) {
+                     return res.status(403).json({ message: 'Grid is already assigned to another volunteer.' });
+                }
+            }
             if (volunteerId === null) {
                 const checkRes = await pool.query('SELECT assigned_volunteer_id FROM grid_squares WHERE id = $1', [gridId]);
                 if (checkRes.rows.length > 0 && String(checkRes.rows[0].assigned_volunteer_id) !== String(req.user.id)) {
