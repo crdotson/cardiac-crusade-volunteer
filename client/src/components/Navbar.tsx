@@ -16,7 +16,7 @@ const Navbar: React.FC = () => {
 
   if (!user) return null;
 
-  const canViewUsers = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user.role);
+  const canViewUsers = ['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user.role);
 
   return (
     <nav className="nav-bar">

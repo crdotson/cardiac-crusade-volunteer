@@ -319,11 +319,11 @@ const Map: React.FC = () => {
   };
 
   const fetchVolunteers = async () => {
-    if (['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '')) {
+    if (['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user?.role || '')) {
       try {
         const res = await axios.get('api/users');
         const data = res.data;
-        setVolunteers(data.filter((u: any) => u.role === 'Volunteer' || u.role === 'CHAARG leader'));
+        setVolunteers(data.filter((u: any) => u.role === 'Volunteer' || u.role === 'Volunteer leader'));
       } catch (err) {
         console.error('Failed to fetch volunteers', err);
       }
@@ -591,7 +591,7 @@ const Map: React.FC = () => {
     }
   };
 
-  const canAssign = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
+  const canAssign = ['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user?.role || '');
 
   const filteredCandidates = (candidates || [])
     .map((c, originalIndex) => ({ ...c, originalIndex }))
@@ -603,7 +603,7 @@ const Map: React.FC = () => {
       return matchesText && matchesCat;
     });
 
-  const isPrivilegedUser = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
+  const isPrivilegedUser = ['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user?.role || '');
 
   return (
     <div className="container" style={{ maxWidth: '100%', padding: '1rem' }}>
@@ -623,7 +623,7 @@ const Map: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            {['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '') && (
+            {['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user?.role || '') && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid #ddd', paddingLeft: '1rem' }}>
                 <label style={{ whiteSpace: 'nowrap' }}>Assign to:</label>
                 <select 
@@ -669,7 +669,7 @@ const Map: React.FC = () => {
               }}
               eventHandlers={{
                  click: async () => {
-                     const isPrivileged = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
+                     const isPrivileged = ['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user?.role || '');
                      
                      if (!isPrivileged) {
                          if (grid.assigned_volunteer_id && String(grid.assigned_volunteer_id) !== String(user?.id)) {

@@ -5,7 +5,7 @@ Personas:
 
 1. Application administrator  
 2. City Coordinator  
-3. CHAARG leader  
+3. Volunteer leader  
 4. Volunteers
 
                                                                                                                                                        
@@ -14,7 +14,7 @@ Functional requirements:
 
 * The application administrator e-mail and password will be created when the application is created.
 
-* The application will have four views:  users, settings, map, list.  The Users view will only be accessible by the Application Administrator, City Coordinator, or CHAARG leader roles.  
+* The application will have four views:  users, settings, map, list.  The Users view will only be accessible by the Application Administrator, City Coordinator, or Volunteer leader roles.  
      
 * Users, settings, and map views will be accessible via a navbar at the top.  Settings will be accessible via a gear icon in the upper right, with a logout icon to the right of it.  
      
@@ -35,10 +35,10 @@ Users view:
 Map view and List view:
 
 * Map view and list view will each display the targeted locations.  
-* City coordinator or CHAARG leaders will have an Assign button to assign, unassign, or reassign the following to a volunteer:  
+* City coordinator or Volunteer leaders will have an Assign button to assign, unassign, or reassign the following to a volunteer:  
   1. A geographical area, by drawing a rectangle on the map.  After the area is selected, it will display the number of targeted locations currently inside that area.  The area may then be resized using both corner resizers or side resizers, and the map may be zoomed in and out with pinch gestures while the resizing is taking place.  Once the confirm button is clicked, all targeted locations within that area will be assigned to the selected user unless the targeted locations were specifically overridden.   
   2. Specific targeted locations.  A targeted location may be selected from the map view or list view and assigned/reassigned/unassigned to a user.  If a targeted location is specifically assigned to a volunteer, that assignment will take precedence over the geographical area assignment for another volunteer.  
-* City coordinator or CHAARG leaders may import a list of targeted locations based on a dropdown list of pre-populated categories in CATEGORIES.txt, or may type in a category.  
+* City coordinator or Volunteer leaders may import a list of targeted locations based on a dropdown list of pre-populated categories in CATEGORIES.txt, or may type in a category.  
   1. Ask for the correct city to use, default is Lexington, KY.   
   2. Use the Google Places API to query for places in that city that match the category name, and import the business name, address, GPS coordinates, and telephone number (if telephone number is available).  Do not import duplicates.  Duplicates are defined as any business where both a fuzzy match of the business name and a fuzzy match of the business address both match.  
   3. Provide a list of non-duplicate targeted locations that may be imported for review.  Initially, all candidate locations should be selected, with the option to deselect locations, and a "deselect all" button.  
@@ -51,7 +51,7 @@ Map view and List view:
   - **Yellow**: Status ends with "Follow up" or "Follow-up".
   - **Green**: Any other status that ends with "Done".
 
-* City Coordinator, CHAARG leaders, and volunteers may select a location to view it.  On the view screen, there should be a link "Identify or Verify this AED" link that opens [https://aed.new](https://aed.new) in a new window.  Also on the view screen, the user may change the status of a location to one of the following and click Save:  
+* City Coordinator, Volunteer leaders, and volunteers may select a location to view it.  On the view screen, there should be a link "Identify or Verify this AED" link that opens [https://aed.new](https://aed.new) in a new window.  Also on the view screen, the user may change the status of a location to one of the following and click Save:  
      
   Unvisited  
   AED status unknown \- Follow-up  
@@ -68,7 +68,7 @@ Map view and List view:
    
 Reporting: 
 
-* City coordinator or CHAARG leaders can see volunteer progress by individual volunteer, or rolled up by CHAARG leaders, or rolled up by city coordinator.  
+* City coordinator or Volunteer leaders can see volunteer progress by individual volunteer, or rolled up by Volunteer leaders, or rolled up by city coordinator.  
 * Progress has two metrics:  Number of locations where the user changed the status to "AED Located and mapped at aed.new \- Done", and number of locations where the user changed the status to any other status except for "Unvisited".  
 
 

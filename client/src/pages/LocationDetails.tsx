@@ -42,7 +42,7 @@ const LocationDetails: React.FC = () => {
   };
 
   const fetchAssignableUsers = async () => {
-    if (['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(currentUser?.role || '')) {
+    if (['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(currentUser?.role || '')) {
       try {
         const res = await axios.get('api/users/assignable');
         setAssignableUsers(res.data);
@@ -98,7 +98,7 @@ const LocationDetails: React.FC = () => {
   if (loading) return <div className="container">Loading...</div>;
   if (!location) return <div className="container">Location not found.</div>;
 
-  const canAssign = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(currentUser?.role || '');
+  const canAssign = ['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(currentUser?.role || '');
 
   return (
     <div className="container">

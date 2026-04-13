@@ -176,22 +176,22 @@ const Users: React.FC = () => {
 
   const getEditRoles = () => {
     if (currentUser?.role === 'Application Administrator') {
-      return ['Application Administrator', 'City Coordinator', 'CHAARG leader', 'Volunteer'];
+      return ['Application Administrator', 'City Coordinator', 'Volunteer leader', 'Volunteer'];
     }
     if (currentUser?.role === 'City Coordinator') {
-      return ['City Coordinator', 'CHAARG leader', 'Volunteer'];
+      return ['City Coordinator', 'Volunteer leader', 'Volunteer'];
     }
     return [];
   };
 
   const getAvailableRoles = () => {
     if (currentUser?.role === 'Application Administrator') {
-      return ['Application Administrator', 'City Coordinator', 'CHAARG leader', 'Volunteer'];
+      return ['Application Administrator', 'City Coordinator', 'Volunteer leader', 'Volunteer'];
     }
     if (currentUser?.role === 'City Coordinator') {
-      return ['CHAARG leader', 'Volunteer'];
+      return ['Volunteer leader', 'Volunteer'];
     }
-    if (currentUser?.role === 'CHAARG leader') {
+    if (currentUser?.role === 'Volunteer leader') {
       return ['Volunteer'];
     }
     return [];
@@ -337,7 +337,7 @@ const Users: React.FC = () => {
                 <select 
                   value={editingUser.role} 
                   onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                  disabled={currentUser?.role === 'CHAARG leader'}
+                  disabled={currentUser?.role === 'Volunteer leader'}
                 >
                   {(currentUser?.role === 'Application Administrator' || currentUser?.role === 'City Coordinator') ? (
                     getEditRoles().map(r => (

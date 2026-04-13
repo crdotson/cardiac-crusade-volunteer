@@ -538,7 +538,7 @@ mainRouter.get('/api/auth/facebook', (req, res) => res.status(501).json({ messag
 
 // --- Users Management (Phase 2) ---
 
-mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'Volunteer leader'), async (req, res) => {
     try {
         const { role, id } = req.user;
         let query = '';
@@ -551,16 +551,16 @@ mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Admi
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
             `;
         } else if (role === 'City Coordinator') {
-            // City Coordinators see users they created OR users created by CHAARG leaders they supervise
+            // City Coordinators see users they created OR users created by Volunteer leaders they supervise
             query = `
                 SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
                 FROM users u 
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
                 WHERE u.roll_up_to_id = $1 
-                OR u.roll_up_to_id IN (SELECT id FROM users WHERE roll_up_to_id = $1 AND role = 'CHAARG leader')
+                OR u.roll_up_to_id IN (SELECT id FROM users WHERE roll_up_to_id = $1 AND role = 'Volunteer leader')
             `;
             params = [id];
-        } else if (role === 'CHAARG leader') {
+        } else if (role === 'Volunteer leader') {
             query = `
                 SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
                 FROM users u 
@@ -578,17 +578,17 @@ mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Admi
     }
 });
 
-mainRouter.post('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.post('/api/users', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'Volunteer leader'), async (req, res) => {
     const { email, name, password, role } = req.body;
     const creatorRole = req.user.role;
     const creatorId = req.user.id;
 
     // Hierarchy validation
-    if (creatorRole === 'City Coordinator' && !['CHAARG leader', 'Volunteer'].includes(role)) {
-        return res.status(403).json({ message: 'City Coordinators can only create CHAARG leaders or Volunteers' });
+    if (creatorRole === 'City Coordinator' && !['Volunteer leader', 'Volunteer'].includes(role)) {
+        return res.status(403).json({ message: 'City Coordinators can only create Volunteer leaders or Volunteers' });
     }
-    if (creatorRole === 'CHAARG leader' && role !== 'Volunteer') {
-        return res.status(403).json({ message: 'CHAARG leaders can only create Volunteers' });
+    if (creatorRole === 'Volunteer leader' && role !== 'Volunteer') {
+        return res.status(403).json({ message: 'Volunteer leaders can only create Volunteers' });
     }
 
     try {
@@ -626,7 +626,7 @@ mainRouter.post('/api/users/bulk', authenticateToken, authorizeRoles('Applicatio
     }
 });
 
-mainRouter.patch('/api/users/:id', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.patch('/api/users/:id', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'Volunteer leader'), async (req, res) => {
     const { email, name, role, roll_up_to_id } = req.body;
     const targetId = req.params.id;
     const requesterRole = req.user.role;
@@ -638,12 +638,12 @@ mainRouter.patch('/api/users/:id', authenticateToken, authorizeRoles('Applicatio
 
         // Role modification logic
         if (role && role !== targetUser.role) {
-            if (requesterRole === 'CHAARG leader') {
-                return res.status(403).json({ message: 'CHAARG leaders cannot change roles' });
+            if (requesterRole === 'Volunteer leader') {
+                return res.status(403).json({ message: 'Volunteer leaders cannot change roles' });
             }
             if (requesterRole === 'City Coordinator') {
-                if (!['City Coordinator', 'CHAARG leader', 'Volunteer'].includes(role)) {
-                    return res.status(403).json({ message: 'City Coordinators can only assign City Coordinator, CHAARG leader, or Volunteer roles' });
+                if (!['City Coordinator', 'Volunteer leader', 'Volunteer'].includes(role)) {
+                    return res.status(403).json({ message: 'City Coordinators can only assign City Coordinator, Volunteer leader, or Volunteer roles' });
                 }
             }
             // Admins can set any role
@@ -747,10 +747,10 @@ mainRouter.get('/api/locations', authenticateToken, async (req, res) => {
         } else if (role === 'City Coordinator') {
             query += ` WHERE l.assigned_volunteer_id IN (
                 SELECT id FROM users WHERE roll_up_to_id = $1 OR id = $1
-                OR roll_up_to_id IN (SELECT id FROM users WHERE roll_up_to_id = $1 AND role = 'CHAARG leader')
+                OR roll_up_to_id IN (SELECT id FROM users WHERE roll_up_to_id = $1 AND role = 'Volunteer leader')
             ) OR l.assigned_volunteer_id IS NULL`;
             params = [id];
-        } else if (role === 'CHAARG leader') {
+        } else if (role === 'Volunteer leader') {
             query += ` WHERE l.assigned_volunteer_id IN (SELECT id FROM users WHERE roll_up_to_id = $1 OR id = $1) OR l.assigned_volunteer_id IS NULL`;
             params = [id];
         } else if (role === 'Volunteer') {
@@ -1112,7 +1112,7 @@ mainRouter.post('/api/grids/generate', authenticateToken, authorizeRoles('Applic
     }
 });
 
-mainRouter.post('/api/grids/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader', 'Volunteer'), async (req, res) => {
+mainRouter.post('/api/grids/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'Volunteer leader', 'Volunteer'), async (req, res) => {
     const { volunteerId } = req.body;
     const gridId = req.params.id;
     try {
@@ -1168,7 +1168,7 @@ mainRouter.post('/api/grids/:id/assign', authenticateToken, authorizeRoles('Appl
 });
 
 
-mainRouter.get('/api/users/assignable', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.get('/api/users/assignable', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'Volunteer leader'), async (req, res) => {
     try {
         const { role, id } = req.user;
         let query = '';
@@ -1185,7 +1185,7 @@ mainRouter.get('/api/users/assignable', authenticateToken, authorizeRoles('Appli
                 OR roll_up_to_id IN (SELECT id FROM users WHERE roll_up_to_id = $1)
             `;
             params = [id];
-        } else if (role === 'CHAARG leader') {
+        } else if (role === 'Volunteer leader') {
             // Self + children
             query = 'SELECT id, email, role FROM users WHERE id = $1 OR roll_up_to_id = $1';
             params = [id];
@@ -1199,7 +1199,7 @@ mainRouter.get('/api/users/assignable', authenticateToken, authorizeRoles('Appli
     }
 });
 
-mainRouter.post('/api/locations/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.post('/api/locations/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'Volunteer leader'), async (req, res) => {
     const { volunteerId } = req.body;
     const locationId = req.params.id;
     const creatorId = req.user.id;
@@ -1217,7 +1217,7 @@ mainRouter.post('/api/locations/:id/assign', authenticateToken, authorizeRoles('
                         OR roll_up_to_id IN (SELECT id FROM users WHERE roll_up_to_id = $2)
                     )
                 `;
-            } else if (creatorRole === 'CHAARG leader') {
+            } else if (creatorRole === 'Volunteer leader') {
                 validQuery = 'SELECT id FROM users WHERE id = $1 AND (id = $2 OR roll_up_to_id = $2)';
             }
             const validRes = await pool.query(validQuery, [volunteerId, creatorId]);
@@ -1257,7 +1257,7 @@ mainRouter.get('/api/reporting/metrics', authenticateToken, async (req, res) => 
                 OR id = $1
             `;
             params = [id];
-        } else if (role === 'CHAARG leader') {
+        } else if (role === 'Volunteer leader') {
             userScopeQuery = 'SELECT id, email, role, roll_up_to_id FROM users WHERE roll_up_to_id = $1 OR id = $1';
             params = [id];
         } else {
