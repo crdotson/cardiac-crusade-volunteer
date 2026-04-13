@@ -1110,10 +1110,22 @@ mainRouter.post('/api/grids/generate', authenticateToken, authorizeRoles('Applic
     }
 });
 
-mainRouter.post('/api/grids/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader'), async (req, res) => {
+mainRouter.post('/api/grids/:id/assign', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator', 'CHAARG leader', 'Volunteer'), async (req, res) => {
     const { volunteerId } = req.body;
     const gridId = req.params.id;
     try {
+        if (req.user.role === 'Volunteer') {
+            if (volunteerId !== null && String(volunteerId) !== String(req.user.id)) {
+                 return res.status(403).json({ message: 'Volunteers can only assign grid squares to themselves.' });
+            }
+            if (volunteerId === null) {
+                const checkRes = await pool.query('SELECT assigned_volunteer_id FROM grid_squares WHERE id = $1', [gridId]);
+                if (checkRes.rows.length > 0 && String(checkRes.rows[0].assigned_volunteer_id) !== String(req.user.id)) {
+                     return res.status(403).json({ message: 'Cannot unassign a grid you do not own.' });
+                }
+            }
+        }
+
         // Update Grid Owner
         await pool.query('UPDATE grid_squares SET assigned_volunteer_id = $1 WHERE id = $2', [volunteerId, gridId]);
         

@@ -158,26 +158,6 @@ const getPulsePointLink = () => {
     return "https://aedviewer.pulsepoint.org";
 };
 
-const FitGridsToBounds: React.FC<{ grids: any[] }> = ({ grids }) => {
-  const map = useMap();
-  const hasFittedRef = React.useRef(false);
-
-  React.useEffect(() => {
-    if (!hasFittedRef.current && grids.length > 0) {
-      const bounds = L.latLngBounds(grids.flatMap(g => [
-        [g.south, g.west],
-        [g.north, g.east]
-      ]));
-      if (bounds.isValid()) {
-         map.fitBounds(bounds, { padding: [20, 20] });
-         hasFittedRef.current = true;
-      }
-    }
-  }, [grids, map]);
-
-  return null;
-};
-
 const Map: React.FC = () => {
   const { user } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -658,12 +638,11 @@ const Map: React.FC = () => {
       <div className={isFullscreen ? "" : "card"} style={isFullscreen ? {position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, padding: 0, background: '#fff'} : { padding: 0, height: '70vh', position: 'relative' }}>
         <button 
           onClick={() => setIsFullscreen(!isFullscreen)} 
-          style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 1000, padding: '5px 10px', background: 'white', border: '2px solid rgba(0,0,0,0.2)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+          style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 1000, padding: '5px 10px', background: 'white', color: 'black', border: '2px solid rgba(0,0,0,0.2)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
         >
           {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
         </button>
         <MapContainer center={[38.0406, -84.5037]} zoom={13} style={{ height: '100%', width: '100%' }}>
-          <FitGridsToBounds grids={grids} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
