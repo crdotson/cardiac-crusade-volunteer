@@ -122,6 +122,7 @@ const MapEvents = ({ onDrawCreated, onImportAreaCreated, activeTool, onToolEnabl
       editMode: false,
       dragMode: false,
       removalMode: false,
+      rotateMode: false,
     });
 
     map.on('pm:drawstart', () => {
@@ -151,6 +152,14 @@ const MapEvents = ({ onDrawCreated, onImportAreaCreated, activeTool, onToolEnabl
   }, [map]);
 
   return null;
+};
+
+const getPulsePointLink = () => {
+    const ua = navigator.userAgent;
+    if (/iPad|iPhone|iPod/.test(ua)) {
+        return "https://apps.apple.com/us/app/pulsepoint-aed/id867150971";
+    }
+    return "https://play.google.com/store/apps/details?id=org.pulsepoint.aeds.android&hl=en_US";
 };
 
 const Map: React.FC = () => {
@@ -708,13 +717,13 @@ const Map: React.FC = () => {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                       <a
-                        href="https://aed.new"
+                        href={getPulsePointLink()}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="button primary"
                         style={{ fontSize: '0.8rem', padding: '6px 10px', textDecoration: 'none', textAlign: 'center' }}
                       >
-                        Verify at aed.new
+                        Verify in PulsePoint AED
                       </a>
                       {['Application Administrator', 'City Coordinator'].includes(user?.role || '') && (
                         <button 

@@ -4,6 +4,14 @@ import axios from 'axios';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 
+const getPulsePointLink = () => {
+    const ua = navigator.userAgent;
+    if (/iPad|iPhone|iPod/.test(ua)) {
+        return "https://apps.apple.com/us/app/pulsepoint-aed/id867150971";
+    }
+    return "https://play.google.com/store/apps/details?id=org.pulsepoint.aeds.android&hl=en_US";
+};
+
 const LocationDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [location, setLocation] = useState<any>(null);
@@ -118,7 +126,7 @@ const LocationDetails: React.FC = () => {
             
             <div style={{ marginTop: '2rem' }}>
               <a 
-                href="https://aed.new" 
+                href={getPulsePointLink()} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="button primary"
@@ -127,7 +135,7 @@ const LocationDetails: React.FC = () => {
                 Identify or Verify this AED
               </a>
               <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: '#666' }}>
-                Opens aed.new in a new window to map the AED.
+                Opens PulsePoint AED to map the AED.
               </p>
             </div>
           </div>
@@ -169,7 +177,7 @@ const LocationDetails: React.FC = () => {
         <div className="modal-overlay">
           <div className="modal-content card" style={{ maxWidth: '400px' }}>
             <h3 style={{ color: 'var(--primary-color)' }}>Confirm Completion</h3>
-            <p>Please confirm that you have mapped this in https://aed.new.</p>
+            <p>Please confirm that you have mapped this in the PulsePoint AED app.</p>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
               <button className="primary" onClick={() => updateStatus('AED located and mapped at aed.new - Done')}>Confirm</button>
               <button className="secondary" onClick={() => setShowConfirmation(false)}>Cancel</button>
