@@ -158,8 +158,29 @@ const getPulsePointLink = () => {
     return "https://aedviewer.pulsepoint.org";
 };
 
+const FitGridsToBounds: React.FC<{ grids: any[] }> = ({ grids }) => {
+  const map = useMap();
+  const hasFittedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!hasFittedRef.current && grids.length > 0) {
+      const bounds = L.latLngBounds(grids.flatMap(g => [
+        [g.south, g.west],
+        [g.north, g.east]
+      ]));
+      if (bounds.isValid()) {
+         map.fitBounds(bounds, { padding: [20, 20] });
+         hasFittedRef.current = true;
+      }
+    }
+  }, [grids, map]);
+
+  return null;
+};
+
 const Map: React.FC = () => {
   const { user } = useAuth();
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [selectedVolunteer, setSelectedVolunteer] = useState<string>('');
@@ -593,11 +614,14 @@ const Map: React.FC = () => {
       return matchesText && matchesCat;
     });
 
+  const isPrivilegedUser = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
+
   return (
     <div className="container" style={{ maxWidth: '100%', padding: '1rem' }}>
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div className="button-group">
+      {isPrivilegedUser && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div className="button-group">
             {['Application Administrator', 'City Coordinator'].includes(user?.role || '') && (
               <>
                 <button onClick={() => setShowImport(true)}>Import by Category</button>
@@ -629,9 +653,17 @@ const Map: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
 
-      <div className="card" style={{ padding: 0, height: '70vh', position: 'relative' }}>
+      <div className={isFullscreen ? "" : "card"} style={isFullscreen ? {position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, padding: 0, background: '#fff'} : { padding: 0, height: '70vh', position: 'relative' }}>
+        <button 
+          onClick={() => setIsFullscreen(!isFullscreen)} 
+          style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 1000, padding: '5px 10px', background: 'white', border: '2px solid rgba(0,0,0,0.2)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+        </button>
         <MapContainer center={[38.0406, -84.5037]} zoom={13} style={{ height: '100%', width: '100%' }}>
+          <FitGridsToBounds grids={grids} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -647,7 +679,10 @@ const Map: React.FC = () => {
               }}
               eventHandlers={{
                  click: async () => {
-                     const targetVolunteer = (['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '')) ? selectedVolunteer : user?.id;
+                     const isPrivileged = ['Application Administrator', 'City Coordinator', 'CHAARG leader'].includes(user?.role || '');
+                     const targetVolunteer = isPrivileged 
+                        ? selectedVolunteer 
+                        : (String(grid.assigned_volunteer_id) === String(user?.id) ? null : user?.id);
                      try {
                          await axios.post(`api/grids/${grid.id}/assign`, { volunteerId: targetVolunteer || null });
                          fetchGrids();

@@ -23,6 +23,12 @@ const PrivateRoute: FC<{ children: ReactNode; roles?: string[] }> = ({ children,
 };
 
 const Dashboard: FC = () => {
+  const { user } = useAuth();
+  
+  if (user?.role === 'Volunteer') {
+      return <Navigate to="/map" replace />;
+  }
+
   return (
     <div className="container">
       <div className="card">
