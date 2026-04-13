@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Rectangle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Rectangle, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '@geoman-io/leaflet-geoman-free';
@@ -40,6 +40,15 @@ const getStatusColor = (status: string, assigned: boolean) => {
   if (lowerStatus.endsWith('follow-up') || lowerStatus.endsWith('follow up')) return 'yellow';
   
   return 'gray';
+};
+
+const getVolunteerColor = (identifier: string | null) => {
+  if (!identifier) return 'gray';
+  let hash = 0;
+  for (let i = 0; i < identifier.length; i++) {
+    hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return `hsl(${Math.abs(hash) % 360}, 75%, 45%)`;
 };
 
 const CustomMarkerIcon = (color: string, isTarget: boolean) => {
@@ -647,14 +656,16 @@ const Map: React.FC = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {grids.map((grid) => (
+          {grids.map((grid) => {
+            const gridColor = getVolunteerColor(grid.assigned_volunteer_email);
+            return (
             <Rectangle 
               key={grid.id} 
               bounds={[[grid.south, grid.west], [grid.north, grid.east]]}
               pathOptions={{ 
-                 color: grid.assigned_volunteer_id ? 'blue' : 'gray', 
-                 fillOpacity: grid.assigned_volunteer_id ? 0.3 : 0.1,
-                 weight: 1
+                 color: grid.assigned_volunteer_id ? gridColor : 'gray', 
+                 fillOpacity: grid.assigned_volunteer_id ? 0.35 : 0.1,
+                 weight: grid.assigned_volunteer_id ? 2 : 1
               }}
               eventHandlers={{
                  click: async () => {
@@ -672,11 +683,12 @@ const Map: React.FC = () => {
                  }
               }}
             >
-              {(grid.assigned_volunteer_email || grid.assigned_volunteer_id) && (
-                 <Popup>{grid.assigned_volunteer_email || 'Assigned'}</Popup>
+              {isPrivilegedUser && grid.assigned_volunteer_email && (
+                 <Tooltip sticky direction="top">{grid.assigned_volunteer_email}</Tooltip>
               )}
             </Rectangle>
-          ))}
+            );
+          })}
           {locations.map(loc => {
             const isAssignedToSelected = selectedVolunteer && Number(loc.assigned_volunteer_id) === Number(selectedVolunteer);
             return (
