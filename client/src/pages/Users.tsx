@@ -349,14 +349,27 @@ const Users: React.FC = () => {
                 </select>
               </div>
               <div style={{ marginBottom: '1.5rem' }}>
-                <label>Rolls Up To (Email)</label>
-                <input 
-                  type="text" 
-                  placeholder="Supervisor email"
+                <label>Rolls Up To (Supervisor)</label>
+                <select 
                   value={editingUser.roll_up_to_email || ''} 
                   onChange={(e) => setEditingUser({ ...editingUser, roll_up_to_email: e.target.value })}
-                />
-                <small style={{ color: 'var(--gray)' }}>Changing this requires the supervisor to already exist.</small>
+                >
+                  <option value="">None / Unassigned</option>
+                  {(() => {
+                    const supervisors = users.filter(u => u.role !== 'Volunteer' && u.id !== editingUser.id);
+                    if (currentUser && currentUser.role !== 'Volunteer' && currentUser.id !== editingUser.id && !supervisors.find(u => u.email === currentUser.email)) {
+                      supervisors.push({ email: currentUser.email, name: null, role: currentUser.role, id: currentUser.id } as User);
+                    }
+                    if (editingUser.roll_up_to_email && !supervisors.find(u => u.email === editingUser.roll_up_to_email)) {
+                      supervisors.push({ email: editingUser.roll_up_to_email, name: 'Current Supervisor', role: 'Unknown' } as User);
+                    }
+                    return supervisors.map(u => (
+                      <option key={u.email} value={u.email}>
+                        {u.name ? `${u.name} (${u.email})` : u.email} - {u.role}
+                      </option>
+                    ));
+                  })()}
+                </select>
               </div>
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button type="button" className="secondary" onClick={() => setEditingUser(null)}>Cancel</button>
