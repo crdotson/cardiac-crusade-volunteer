@@ -736,11 +736,13 @@ mainRouter.get('/api/categories', (req, res) => {
 
 mainRouter.get('/api/locations', authenticateToken, async (req, res) => {
     const { role, id } = req.user;
+    const fetchAll = req.query.all === 'true';
+    
     try {
         let query = 'SELECT l.*, u.email as assigned_volunteer_email FROM locations l LEFT JOIN users u ON l.assigned_volunteer_id = u.id';
         let params = [];
 
-        if (role === 'Application Administrator') {
+        if (fetchAll || role === 'Application Administrator') {
             // See all
         } else if (role === 'City Coordinator') {
             query += ` WHERE l.assigned_volunteer_id IN (
