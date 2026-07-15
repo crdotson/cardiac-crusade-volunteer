@@ -258,7 +258,7 @@ const Map: React.FC = () => {
 
           const handlePlaceSelect = async (e: any) => {
             console.log('Place changed/selected event fired:', e.type);
-            const rawPlace = e.place || autocomplete.value || autocomplete.place || (e.placePrediction && typeof e.placePrediction.toPlace === 'function' ? e.placePrediction.toPlace() : null);
+            const rawPlace = e.place || autocomplete.place || (e.placePrediction && typeof e.placePrediction.toPlace === 'function' ? e.placePrediction.toPlace() : null);
             console.log('Selected place object:', rawPlace);
             
             if (rawPlace) {
