@@ -80,3 +80,9 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 **Changes Made:**
 1. **Frontend CSV Parsing**: Integrated `papaparse` in `Map.tsx` to handle CSV file reading directly in the browser. Added strict logic to ensure headers either accurately define a `name,address` structure, a 6-column `name,address,phone,category,status,assignto` structure, or are omitted entirely (in which case it enforces column count validation). Added an `Application Administrator` restricted "Import from CSV" modal to guide the process.
 2. **Backend CSV Processing**: Added `POST /api/locations/import-csv` to process bulk row uploads. The backend iteratively geocodes each address via Google Places API (reporting failures), checks the database to skip existing addresses, and dynamically creates missing `Volunteer` user profiles if an `assignto` name does not exist. Results, including failures and skips, are clearly aggregated and returned to the admin.
+
+### Session: Implement Notes Field for Locations
+**Changes Made:**
+1. **Database Schema**: Added an `ALTER TABLE locations ADD COLUMN IF NOT EXISTS notes TEXT;` instruction to the backend `initDB` routine to ensure the field initializes automatically.
+2. **CSV Import Compatibility**: Upgraded the `papaparse` CSV engine logic and text instructions to expect either 2 columns (`name, address`) or 7 columns (`name, address, phone, category, status, assignto, notes`). The backend `import-csv` route was also updated to extract the 7th column and push it to the new `notes` database field.
+3. **Frontend Integration**: Plumbed the new `notes` field through the entire user interface. A multi-line textarea for notes was added to the "Manually Add" modal. Map marker Popups were updated to dynamically display `notes` inline with other metadata if it exists. Finally, `LocationDetails.tsx` (the "Details" button view) was updated to render the full text string.

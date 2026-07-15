@@ -119,6 +119,9 @@ const LocationDetails: React.FC = () => {
               </span>
             </p>
             <p><strong>Assigned To:</strong> {location.volunteer_email || 'Unassigned'}</p>
+            {location.notes && (
+              <p><strong>Notes:</strong> {location.notes}</p>
+            )}
             
             <div style={{ marginTop: '2rem' }}>
               <a 

@@ -111,6 +111,10 @@ async function initDB() {
       `);
 
       await pool.query(`
+        ALTER TABLE locations ADD COLUMN IF NOT EXISTS notes TEXT;
+      `);
+
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS audit_logs (
           id SERIAL PRIMARY KEY,
           location_id INTEGER REFERENCES locations(id),
@@ -767,7 +771,7 @@ mainRouter.get('/api/locations', authenticateToken, async (req, res) => {
 });
 
 mainRouter.post('/api/locations', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
-    const { name, address, lat, lng, phone, category, assigned_volunteer_id, status } = req.body;
+    const { name, address, lat, lng, phone, category, assigned_volunteer_id, status, notes } = req.body;
     try {
         let finalVolunteerId = assigned_volunteer_id || null;
         let finalAssignmentType = assigned_volunteer_id ? 'Manual' : null;
@@ -786,8 +790,8 @@ mainRouter.post('/api/locations', authenticateToken, authorizeRoles('Application
         }
 
         const result = await pool.query(
-            'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
-            [name, address, lat, lng, phone, category, status || 'Unvisited', finalVolunteerId, finalAssignmentType]
+            'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
+            [name, address, lat, lng, phone, category, status || 'Unvisited', finalVolunteerId, finalAssignmentType, notes || null]
         );
         res.json(result.rows[0]);
     } catch (err) {
@@ -1154,8 +1158,8 @@ mainRouter.post('/api/locations/import-csv', authenticateToken, authorizeRoles('
 
             // 4. Insert
             await pool.query(
-                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-                [row.name, formattedAddress, lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType]
+                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                [row.name, formattedAddress, lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType, row.notes || null]
             );
             successCount++;
         }

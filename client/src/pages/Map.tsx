@@ -196,7 +196,7 @@ const Map: React.FC = () => {
 
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [manualData, setManualData] = useState<any>({
-    name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', lat: 38.0406, lng: -84.5037
+    name: '', address: '', phone: '', category: '', status: 'Unvisited', assigned_volunteer_id: '', notes: '', lat: 38.0406, lng: -84.5037
   });
 
   const [showDeleteCategory, setShowDeleteCategory] = useState(false);
@@ -508,18 +508,18 @@ const Map: React.FC = () => {
         const firstRowLen = firstRow.filter(c => c !== '').length; // count non-empty columns
         // For matching headers, we check the first N elements
         const isExactMatch2 = firstRow[0] === 'name' && firstRow[1] === 'address' && firstRowLen === 2;
-        const isExactMatch6 = firstRow[0] === 'name' && firstRow[1] === 'address' && firstRow[2] === 'phone' && firstRow[3] === 'category' && firstRow[4] === 'status' && (firstRow[5] === 'assignto' || firstRow[5] === 'assign to') && firstRowLen === 6;
+        const isExactMatch7 = firstRow[0] === 'name' && firstRow[1] === 'address' && firstRow[2] === 'phone' && firstRow[3] === 'category' && firstRow[4] === 'status' && (firstRow[5] === 'assignto' || firstRow[5] === 'assign to') && (firstRow[6] === 'notes' || firstRow[6] === 'note') && firstRowLen === 7;
 
-        if (isExactMatch2 || isExactMatch6) {
+        if (isExactMatch2 || isExactMatch7) {
             // Valid header!
             parsedData.shift(); // remove header
         } else {
             // Check if it looks like an invalid header
-            const commonHeaders = ['name', 'address', 'phone', 'category', 'status', 'assignto', 'assign to', 'business name', 'location'];
+            const commonHeaders = ['name', 'address', 'phone', 'category', 'status', 'assignto', 'assign to', 'notes', 'note', 'business name', 'location'];
             const looksLikeHeader = firstRow.some(col => commonHeaders.includes(col));
             
             if (looksLikeHeader) {
-                alert("Invalid header row. Columns should be name,address or name,address,phone,category,status,assignto");
+                alert("Invalid header row. Columns should be name,address or name,address,phone,category,status,assignto,notes");
                 setCsvImporting(false);
                 return;
             }
@@ -532,8 +532,8 @@ const Map: React.FC = () => {
                return;
             }
             const firstDataRowLen = firstDataRow.length;
-            if (firstDataRowLen !== 2 && firstDataRowLen !== 6) {
-                alert("If the header row is missing, the CSV should have exactly 2 or 6 columns.");
+            if (firstDataRowLen !== 2 && firstDataRowLen !== 7) {
+                alert("If the header row is missing, the CSV should have exactly 2 or 7 columns.");
                 setCsvImporting(false);
                 return;
             }
@@ -546,7 +546,8 @@ const Map: React.FC = () => {
                 phone: row[2]?.trim() || '',
                 category: row[3]?.trim() || '',
                 status: row[4]?.trim() || 'Unvisited',
-                assignto: row[5]?.trim() || ''
+                assignto: row[5]?.trim() || '',
+                notes: row[6]?.trim() || ''
             };
         });
 
@@ -848,6 +849,9 @@ const Map: React.FC = () => {
                         <span className="badge" style={{ backgroundColor: '#3498db' }}>{loc.assigned_volunteer_email}</span>
                       )}
                     </div>
+                    {loc.notes && (
+                      <p style={{ margin: '0 0 10px 0', fontSize: '0.8rem', fontStyle: 'italic' }}><strong>Notes:</strong> {loc.notes}</p>
+                    )}
                     
                     <div className="form-group" style={{ marginBottom: '10px' }}>
                       <label style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Status</label>
@@ -1056,6 +1060,15 @@ const Map: React.FC = () => {
                 ))}
               </select>
             </div>
+            <div className="form-group">
+              <label>Notes</label>
+              <textarea 
+                placeholder="Enter notes..." 
+                value={manualData.notes} 
+                onChange={e => setManualData({ ...manualData, notes: e.target.value })} 
+                style={{ width: '100%', minHeight: '60px' }}
+              />
+            </div>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
               <button onClick={handleManualSubmit} disabled={!manualData.name || !manualData.address}>Add Location</button>
               <button className="secondary" onClick={() => setShowManualAdd(false)}>Cancel</button>
@@ -1206,7 +1219,7 @@ const Map: React.FC = () => {
             
             {!csvImportResults ? (
               <>
-                <p>Columns should be <strong>name, address, phone, category, status, and assignto</strong>. Only name and address are required.</p>
+                <p>Columns should be <strong>name, address, phone, category, status, assignto, and notes</strong>. Only name and address are required.</p>
                 <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
                   <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files ? e.target.files[0] : null)} />
                 </div>
