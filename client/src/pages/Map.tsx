@@ -461,10 +461,9 @@ const Map: React.FC = () => {
 
     setIsImporting(true);
     try {
-      const res = await axios.post('api/locations/confirm-import', {
+      await axios.post('api/locations/confirm-import', {
         locations: locationsToImport
       });
-      alert(`Imported ${res.data.importedCount} locations.`);
       setShowImport(false);
       setCandidates([]);
       fetchLocations();
