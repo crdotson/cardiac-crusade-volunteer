@@ -7,6 +7,7 @@ import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import confetti from 'canvas-confetti';
+import Papa from 'papaparse';
 
 // Fix Leaflet marker icon issue
 // @ts-ignore
@@ -208,6 +209,10 @@ const Map: React.FC = () => {
   const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvImportResults, setCsvImportResults] = useState<any>(null);
 
   // Stable script loader
   useEffect(() => {
@@ -485,6 +490,89 @@ const Map: React.FC = () => {
     setSelectedCandidates(new Set());
   };
 
+  const handleCsvImportSubmit = () => {
+    if (!csvFile) return;
+    setCsvImporting(true);
+
+    Papa.parse(csvFile, {
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const parsedData = results.data as string[][];
+        if (parsedData.length === 0) {
+          alert('CSV is empty');
+          setCsvImporting(false);
+          return;
+        }
+
+        const firstRow = parsedData[0].map(c => c?.trim().toLowerCase() || '');
+        const firstRowLen = firstRow.filter(c => c !== '').length; // count non-empty columns
+        // For matching headers, we check the first N elements
+        const isExactMatch2 = firstRow[0] === 'name' && firstRow[1] === 'address' && firstRowLen === 2;
+        const isExactMatch6 = firstRow[0] === 'name' && firstRow[1] === 'address' && firstRow[2] === 'phone' && firstRow[3] === 'category' && firstRow[4] === 'status' && (firstRow[5] === 'assignto' || firstRow[5] === 'assign to') && firstRowLen === 6;
+
+        if (isExactMatch2 || isExactMatch6) {
+            // Valid header!
+            parsedData.shift(); // remove header
+        } else {
+            // Check if it looks like an invalid header
+            const commonHeaders = ['name', 'address', 'phone', 'category', 'status', 'assignto', 'assign to', 'business name', 'location'];
+            const looksLikeHeader = firstRow.some(col => commonHeaders.includes(col));
+            
+            if (looksLikeHeader) {
+                alert("Invalid header row. Columns should be name,address or name,address,phone,category,status,assignto");
+                setCsvImporting(false);
+                return;
+            }
+            
+            // Assume it's data (header missing). Check column count of actual data (filter empty rows first)
+            const firstDataRow = parsedData.find(row => row.some(c => c.trim() !== ''));
+            if (!firstDataRow) {
+               alert('CSV contains no data');
+               setCsvImporting(false);
+               return;
+            }
+            const firstDataRowLen = firstDataRow.length;
+            if (firstDataRowLen !== 2 && firstDataRowLen !== 6) {
+                alert("If the header row is missing, the CSV should have exactly 2 or 6 columns.");
+                setCsvImporting(false);
+                return;
+            }
+        }
+
+        const rowsToProcess = parsedData.filter(row => row.some(c => c.trim() !== '')).map(row => {
+            return {
+                name: row[0]?.trim() || '',
+                address: row[1]?.trim() || '',
+                phone: row[2]?.trim() || '',
+                category: row[3]?.trim() || '',
+                status: row[4]?.trim() || 'Unvisited',
+                assignto: row[5]?.trim() || ''
+            };
+        });
+
+        if (rowsToProcess.length === 0) {
+          alert('No valid rows to process');
+          setCsvImporting(false);
+          return;
+        }
+
+        try {
+          const res = await axios.post('api/locations/import-csv', { rows: rowsToProcess });
+          setCsvImportResults(res.data);
+          fetchLocations();
+        } catch (err: any) {
+          alert(err.response?.data?.message || 'CSV Import failed');
+        } finally {
+          setCsvImporting(false);
+        }
+      },
+      error: (err) => {
+        alert('Failed to parse CSV: ' + err.message);
+        setCsvImporting(false);
+      }
+    });
+  };
+
   const handleManualSubmit = async () => {
     console.log('handleManualSubmit started, manualData state is:', manualData);
     let dataToSave = { ...manualData };
@@ -655,6 +743,9 @@ const Map: React.FC = () => {
               <>
                 <button onClick={() => setShowImport(true)}>Import by Category</button>
                 <button onClick={() => setActiveTool('ImportRectangle')}>Import by Area</button>
+                {user?.role === 'Application Administrator' && (
+                  <button onClick={() => setShowCsvImport(true)}>Import from CSV</button>
+                )}
                 <button onClick={() => setShowManualAdd(true)}>Manually Add</button>
                 <button onClick={() => { setShowDeleteCategory(true); setDeleteCategory(categories[0] || ''); setLocationsToDelete([]); }} style={{ backgroundColor: 'darkred' }}>Delete by Category</button>
                 {user?.role === 'Application Administrator' && (
@@ -1102,6 +1193,62 @@ const Map: React.FC = () => {
                 <button style={{ backgroundColor: 'darkred' }} onClick={handleDeleteAll}>Yes, Delete Everything</button>
                 <button className="secondary" onClick={() => setShowDeleteAll(false)}>Cancel</button>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showCsvImport && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '600px' }}>
+            <button className="close-btn" onClick={() => { setShowCsvImport(false); setCsvImportResults(null); setCsvFile(null); }}>&times;</button>
+            <h3 style={{ color: 'var(--primary)' }}>Import from CSV</h3>
+            
+            {!csvImportResults ? (
+              <>
+                <p>Columns should be <strong>name, address, phone, category, status, and assignto</strong>. Only name and address are required.</p>
+                <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+                  <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files ? e.target.files[0] : null)} />
+                </div>
+                {csvImporting ? (
+                  <p>Processing CSV... This may take a moment.</p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button onClick={handleCsvImportSubmit} disabled={!csvFile}>Import</button>
+                    <button className="secondary" onClick={() => setShowCsvImport(false)}>Cancel</button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p>Successfully imported <strong>{csvImportResults.successCount}</strong> locations.</p>
+                
+                {csvImportResults.ignoredRows?.length > 0 && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <h4 style={{ color: 'orange' }}>Ignored (Already Exists): {csvImportResults.ignoredRows.length}</h4>
+                    <ul style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.9em' }}>
+                      {csvImportResults.ignoredRows.map((r: any, i: number) => (
+                        <li key={i}>{r.name} - {r.address}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {csvImportResults.failedRows?.length > 0 && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <h4 style={{ color: 'red' }}>Failed (Address Not Found): {csvImportResults.failedRows.length}</h4>
+                    <ul style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.9em' }}>
+                      {csvImportResults.failedRows.map((r: any, i: number) => (
+                        <li key={i}>{r.name} - {r.address}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                  <button onClick={() => { setShowCsvImport(false); setCsvImportResults(null); setCsvFile(null); }}>Close</button>
+                </div>
+              </>
             )}
           </div>
         </div>

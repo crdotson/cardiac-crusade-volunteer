@@ -1076,6 +1076,101 @@ mainRouter.post('/api/locations/geocode', authenticateToken, authorizeRoles('App
     }
 });
 
+mainRouter.post('/api/locations/import-csv', authenticateToken, authorizeRoles('Application Administrator'), async (req, res) => {
+    const { rows } = req.body;
+    const failedRows = [];
+    const ignoredRows = [];
+    let successCount = 0;
+
+    try {
+        const keyRes = await pool.query("SELECT value FROM settings WHERE key = 'google_api_key'");
+        const apiKey = keyRes.rows[0]?.value;
+
+        for (const row of rows) {
+            // 1. Check if location exists
+            const existing = await pool.query('SELECT id FROM locations WHERE address = $1', [row.address]);
+            if (existing.rows.length > 0) {
+                ignoredRows.push(row);
+                continue;
+            }
+
+            // 2. Geocode
+            let lat, lng, formattedAddress = row.address;
+            if (apiKey) {
+                try {
+                    const geoRes = await axios.post('https://places.googleapis.com/v1/places:searchText', {
+                        textQuery: row.address
+                    }, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Goog-Api-Key': apiKey,
+                            'X-Goog-FieldMask': 'places.formattedAddress,places.location'
+                        }
+                    });
+
+                    if (!geoRes.data.places || geoRes.data.places.length === 0) {
+                        failedRows.push(row);
+                        continue;
+                    }
+                    const geo = geoRes.data.places[0];
+                    lat = geo.location.latitude;
+                    lng = geo.location.longitude;
+                    formattedAddress = geo.formattedAddress;
+                } catch (err) {
+                    console.error("Geocode failed for row:", row.address);
+                    failedRows.push(row);
+                    continue;
+                }
+            } else {
+                failedRows.push(row);
+                continue;
+            }
+
+            // 3. User check / creation
+            let volunteerId = null;
+            if (row.assignto) {
+                const userRes = await pool.query('SELECT id FROM users WHERE name ILIKE $1 OR email ILIKE $1', [row.assignto]);
+                if (userRes.rows.length > 0) {
+                    volunteerId = userRes.rows[0].id;
+                } else {
+                    const email = row.assignto.includes('@') ? row.assignto : `${row.assignto.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}${Date.now()}@placeholder.local`;
+                    const newU = await pool.query('INSERT INTO users (email, name, role) VALUES ($1, $2, $3) RETURNING id', [email, row.assignto, 'Volunteer']);
+                    volunteerId = newU.rows[0].id;
+                }
+            }
+            
+            let finalAssignmentType = volunteerId ? 'Manual' : null;
+            if (!volunteerId) {
+                const gridRes = await pool.query(`
+                    SELECT assigned_volunteer_id FROM grid_squares
+                    WHERE $1 <= north AND $1 >= south AND $2 <= east AND $2 >= west
+                    AND assigned_volunteer_id IS NOT NULL LIMIT 1
+                `, [lat, lng]);
+                if (gridRes.rows.length > 0) {
+                    volunteerId = gridRes.rows[0].assigned_volunteer_id;
+                    finalAssignmentType = 'Grid';
+                }
+            }
+
+            // 4. Insert
+            await pool.query(
+                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                [row.name, formattedAddress, lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType]
+            );
+            successCount++;
+        }
+
+        res.json({
+            successCount,
+            failedRows,
+            ignoredRows
+        });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 mainRouter.get('/api/grids', authenticateToken, async (req, res) => {
     try {
