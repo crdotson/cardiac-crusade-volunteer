@@ -494,7 +494,7 @@ const Map: React.FC = () => {
         dataToSave.lng = res.data.lng;
         dataToSave.address = res.data.formatted_address;
       } catch (err: any) {
-        alert('Could not find location for this address. Please ensure "Geocoding API" is enabled in your Google Cloud Console, or select an option from the autocomplete list.');
+        alert('Could not find exact location for this address. Please ensure the address is correct, or select an option from the autocomplete list.');
         return;
       }
     }

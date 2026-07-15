@@ -70,3 +70,8 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 
 **Difficulties Encountered:**
 - **Silently Blocked Dialogues:** Features using `window.confirm` failed without console errors because the browser intercepted and auto-declined the native prompt. Always favor custom HTML/React modals for user confirmation rather than relying on `prompt()` or `confirm()`.
+
+### Session: Resolving Foreign Key Restraints & Consolidating Google APIs
+**Changes Made:**
+1. **Audit Logs Cleanup**: All location deletion endpoints (`DELETE /api/locations/:id`, `POST /api/locations/bulk-delete`, `POST /api/locations/bulk-delete-all`) were updated to first query `DELETE FROM audit_logs` for matching `location_id` rows before attempting to drop the locations. This resolves `foreign key constraint` Postgres violations that previously aborted location deletion whenever a location's status had been altered and logged.
+2. **Consolidating Geocoding APIs**: The `/api/locations/geocode` backend route was completely refactored to utilize the **Places API (New) `searchText`** endpoint instead of the legacy Geocoding API. This consolidates external dependencies so the application only requires a single enabled API in Google Cloud Console, preventing manual additions from failing with a `400 Bad Request` if the user hadn't manually enabled the separate legacy Geocoding API.

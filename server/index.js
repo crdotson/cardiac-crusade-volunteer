@@ -798,6 +798,7 @@ mainRouter.post('/api/locations', authenticateToken, authorizeRoles('Application
 
 mainRouter.delete('/api/locations/:id', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     try {
+        await pool.query('DELETE FROM audit_logs WHERE location_id = $1', [req.params.id]);
         await pool.query('DELETE FROM locations WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
@@ -808,6 +809,7 @@ mainRouter.delete('/api/locations/:id', authenticateToken, authorizeRoles('Appli
 
 mainRouter.post('/api/locations/bulk-delete', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     try {
+        await pool.query('DELETE FROM audit_logs WHERE location_id = ANY($1)', [req.body.ids]);
         await pool.query('DELETE FROM locations WHERE id = ANY($1)', [req.body.ids]);
         res.json({ success: true });
     } catch (err) {
@@ -818,6 +820,7 @@ mainRouter.post('/api/locations/bulk-delete', authenticateToken, authorizeRoles(
 
 mainRouter.post('/api/locations/bulk-delete-all', authenticateToken, authorizeRoles('Application Administrator'), async (req, res) => {
     try {
+        await pool.query('DELETE FROM audit_logs');
         await pool.query('DELETE FROM locations');
         res.json({ success: true });
     } catch (err) {
@@ -1045,24 +1048,27 @@ mainRouter.post('/api/locations/geocode', authenticateToken, authorizeRoles('App
         const apiKey = keyRes.rows[0]?.value;
         if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
 
-        // Use Geocoding API as requested by the error handler configuration
-        const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-            params: {
-                address: address,
-                key: apiKey
+        // Use Places API (New) instead of Geocoding API to reduce required APIs
+        const response = await axios.post('https://places.googleapis.com/v1/places:searchText', {
+            textQuery: address
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'places.formattedAddress,places.location'
             }
         });
 
-        if (response.data.status !== 'OK' || !response.data.results || response.data.results.length === 0) {
-            console.error('Google Geocoding API Error:', response.data.status, response.data.error_message);
-            return res.status(400).json({ message: `Could not find location for: ${address}. Google returned status: ${response.data.status}.` });
+        if (!response.data.places || response.data.places.length === 0) {
+            console.error('Google Places API Error: No results found for geocode query');
+            return res.status(400).json({ message: `Could not find location for: ${address}.` });
         }
 
-        const geo = response.data.results[0];
+        const geo = response.data.places[0];
         res.json({ 
-            lat: geo.geometry.location.lat, 
-            lng: geo.geometry.location.lng, 
-            formatted_address: geo.formatted_address 
+            lat: geo.location.latitude, 
+            lng: geo.location.longitude, 
+            formatted_address: geo.formattedAddress 
         });
     } catch (err) {
         console.error('CRITICAL: geocode failure:', JSON.stringify(err.response?.data || err.message));
