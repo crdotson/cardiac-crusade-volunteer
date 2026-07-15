@@ -262,9 +262,13 @@ const Map: React.FC = () => {
             console.log('Selected place object:', rawPlace);
             
             if (rawPlace) {
-              // Ensure we have the required fields
-              if (typeof rawPlace.fetchFields === 'function' && !rawPlace.location) {
-                 await rawPlace.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+              // Ensure we have the required fields by unconditionally fetching them if the method exists
+              if (typeof rawPlace.fetchFields === 'function') {
+                 try {
+                   await rawPlace.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+                 } catch (err) {
+                   console.error('Error fetching place fields:', err);
+                 }
               }
               const place = rawPlace;
               setManualData((prev: any) => {
