@@ -203,6 +203,11 @@ const Map: React.FC = () => {
   const [locationsToDelete, setLocationsToDelete] = useState<any[]>([]);
   const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<Set<number>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showGridWarning, setShowGridWarning] = useState(false);
+  const [locationToDeleteId, setLocationToDeleteId] = useState<number | null>(null);
+  const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   // Stable script loader
   useEffect(() => {
@@ -375,11 +380,10 @@ const Map: React.FC = () => {
 
   const handleGenerateGridClick = () => {
     if (grids.length > 0) {
-      if (!window.confirm("Are you sure?  This will remove the grid and all grid assignments.")) {
-        return;
-      }
+      setShowGridWarning(true);
+    } else {
+      setActiveTool('MasterRectangle');
     }
-    setActiveTool('MasterRectangle');
   };
 
   const handleConfirmGridGeneration = async () => {
@@ -534,19 +538,35 @@ const Map: React.FC = () => {
       alert('Please select at least one location to delete.');
       return;
     }
-    if (window.confirm(`Are you sure you want to delete ${idsToDelete.length} locations permanently?`)) {
-      setIsDeleting(true);
-      try {
-        await axios.post('api/locations/bulk-delete', { ids: idsToDelete });
-        alert(`Successfully deleted ${idsToDelete.length} locations.`);
-        setShowDeleteCategory(false);
-        setLocationsToDelete([]);
-        fetchLocations();
-      } catch (err: any) {
-        alert(err.response?.data?.message || 'Bulk delete failed.');
-      } finally {
-        setIsDeleting(false);
-      }
+    setShowDeleteCategoryConfirm(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    const idsToDelete = locationsToDelete.filter((_, i) => selectedDeleteIndices.has(i)).map(l => l.id);
+    setIsDeleting(true);
+    try {
+      await axios.post('api/locations/bulk-delete', { ids: idsToDelete });
+      setShowDeleteCategoryConfirm(false);
+      setShowDeleteCategory(false);
+      setLocationsToDelete([]);
+      fetchLocations();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Bulk delete failed.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setIsDeletingAll(true);
+    try {
+      await axios.post('api/locations/bulk-delete-all');
+      setShowDeleteAll(false);
+      fetchLocations();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete all locations.');
+    } finally {
+      setIsDeletingAll(false);
     }
   };
 
@@ -583,14 +603,19 @@ const Map: React.FC = () => {
   };
 
   const handleDeleteLocation = async (id: number) => {
-    if (window.confirm('Delete this location?')) {
-      try {
-        await axios.delete(`api/locations/${id}`);
-        fetchLocations();
-      } catch (err) {
-        console.error('Failed to delete location', err);
-        alert('Failed to delete location.');
-      }
+    setLocationToDeleteId(id);
+  };
+
+  const confirmDeleteLocation = async () => {
+    if (!locationToDeleteId) return;
+    try {
+      await axios.delete(`api/locations/${locationToDeleteId}`);
+      fetchLocations();
+    } catch (err) {
+      console.error('Failed to delete location', err);
+      alert('Failed to delete location.');
+    } finally {
+      setLocationToDeleteId(null);
     }
   };
 
@@ -629,6 +654,9 @@ const Map: React.FC = () => {
                 <button onClick={() => setActiveTool('ImportRectangle')}>Import by Area</button>
                 <button onClick={() => setShowManualAdd(true)}>Manually Add</button>
                 <button onClick={() => { setShowDeleteCategory(true); setDeleteCategory(categories[0] || ''); setLocationsToDelete([]); }} style={{ backgroundColor: 'darkred' }}>Delete by Category</button>
+                {user?.role === 'Application Administrator' && (
+                  <button onClick={() => setShowDeleteAll(true)} style={{ backgroundColor: '#800000' }}>Delete All Locations</button>
+                )}
                 <button onClick={handleGenerateGridClick} style={{ backgroundColor: 'purple' }}>Generate Grid Area</button>
               </>
             )}
@@ -1011,6 +1039,14 @@ const Map: React.FC = () => {
                 </div>
                 {isDeleting ? (
                   <p>Deleting... Please wait.</p>
+                ) : showDeleteCategoryConfirm ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <p style={{ color: 'darkred', fontWeight: 'bold' }}>Are you sure you want to delete {locationsToDelete.filter((_, i) => selectedDeleteIndices.has(i)).length} locations permanently? This cannot be undone.</p>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <button style={{ backgroundColor: 'darkred' }} onClick={confirmBulkDelete}>Yes, Delete Selected</button>
+                      <button className="secondary" onClick={() => setShowDeleteCategoryConfirm(false)}>Cancel</button>
+                    </div>
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <button style={{ backgroundColor: 'darkred' }} onClick={handleBulkDelete}>Delete Selected</button>
@@ -1022,6 +1058,52 @@ const Map: React.FC = () => {
           </div>
         </div>
       )}
+      {showGridWarning && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '500px' }}>
+            <button className="close-btn" onClick={() => setShowGridWarning(false)}>&times;</button>
+            <h3 style={{ color: 'darkred' }}>Warning</h3>
+            <p style={{ fontWeight: 'bold' }}>Are you sure? This will remove the grid and all grid assignments.</p>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button style={{ backgroundColor: 'darkred' }} onClick={() => { setShowGridWarning(false); setActiveTool('MasterRectangle'); }}>Yes, Continue</button>
+              <button className="secondary" onClick={() => setShowGridWarning(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {locationToDeleteId !== null && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '500px' }}>
+            <button className="close-btn" onClick={() => setLocationToDeleteId(null)}>&times;</button>
+            <h3 style={{ color: 'darkred' }}>Delete Location</h3>
+            <p style={{ fontWeight: 'bold' }}>Are you sure you want to permanently delete this location?</p>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button style={{ backgroundColor: 'darkred' }} onClick={confirmDeleteLocation}>Yes, Delete</button>
+              <button className="secondary" onClick={() => setLocationToDeleteId(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteAll && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '500px' }}>
+            <button className="close-btn" onClick={() => setShowDeleteAll(false)}>&times;</button>
+            <h3 style={{ color: 'darkred' }}>Delete All Locations</h3>
+            <p style={{ fontWeight: 'bold' }}>WARNING: You are about to permanently delete ALL locations in the database. This action cannot be undone.</p>
+            {isDeletingAll ? (
+              <p>Deleting... Please wait.</p>
+            ) : (
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button style={{ backgroundColor: 'darkred' }} onClick={handleDeleteAll}>Yes, Delete Everything</button>
+                <button className="secondary" onClick={() => setShowDeleteAll(false)}>Cancel</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

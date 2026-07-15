@@ -62,3 +62,11 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 
 **Difficulties Encountered:**
 - The new `PlaceAutocompleteElement` can yield varying representations of a `Place` object depending on what libraries are loaded, sometimes providing `.location` as a `google.maps.LatLng` (with functions like `.lat()`) and sometimes providing properties (like `.latitude`). Added explicit checks for both functional and property-based coordinate structures to prevent `undefined` properties from skipping geocoding validation.
+
+### Session: Removing Browser-Native Prompts & Fixing Bulk Deletion
+**Changes Made:**
+1. **Removed `window.confirm` Modal Blocks:** Removed all usages of native `window.confirm` dialogues across the Map component (including bulk delete, single delete, and grid generation warnings). Complex React state changes, combined with user preference settings, often cause browsers to silently block these native dialogues resulting in features "doing nothing". Replaced them with robust React state-driven modals.
+2. **Delete All Locations:** Added a robust `POST /api/locations/bulk-delete-all` route to the backend. Added a `Delete All Locations` button to the frontend `Map.tsx` toolbar, heavily restricted by `user?.role === 'Application Administrator'`. Created an explicit warning modal requiring user confirmation before wiping the database.
+
+**Difficulties Encountered:**
+- **Silently Blocked Dialogues:** Features using `window.confirm` failed without console errors because the browser intercepted and auto-declined the native prompt. Always favor custom HTML/React modals for user confirmation rather than relying on `prompt()` or `confirm()`.
