@@ -996,23 +996,22 @@ mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRole
 mainRouter.post('/api/locations/confirm-import', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { locations } = req.body;
     try {
-        // Fetch all current area assignments
-        const assignmentsRes = await pool.query('SELECT user_id, geom FROM assignments');
-        const assignments = assignmentsRes.rows;
+        // Fetch all current grid squares
+        const gridRes = await pool.query('SELECT assigned_volunteer_id, north, south, east, west FROM grid_squares WHERE assigned_volunteer_id IS NOT NULL');
+        const grids = gridRes.rows;
 
         let importedCount = 0;
         for (const loc of locations) {
             let assignedVolunteerId = null;
             let assignmentType = null;
 
-            // Check if location falls within any assignment rectangle
-            for (const assign of assignments) {
-                const { _northEast, _southWest } = assign.geom;
-                if (loc.lat <= _northEast.lat && loc.lat >= _southWest.lat && 
-                    loc.lng <= _northEast.lng && loc.lng >= _southWest.lng) {
-                    assignedVolunteerId = assign.user_id;
-                    assignmentType = 'Area';
-                    break; // Use the first matching assignment found
+            // Check if location falls within any assigned grid square
+            for (const grid of grids) {
+                if (loc.lat <= grid.north && loc.lat >= grid.south && 
+                    loc.lng <= grid.east && loc.lng >= grid.west) {
+                    assignedVolunteerId = grid.assigned_volunteer_id;
+                    assignmentType = 'Grid';
+                    break;
                 }
             }
 

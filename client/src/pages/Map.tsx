@@ -262,12 +262,24 @@ const Map: React.FC = () => {
                  await rawPlace.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
               }
               const place = rawPlace;
-              setManualData((prev: any) => ({
-                ...prev,
-                address: place.formattedAddress || place.displayName || prev.address || '',
-                lat: place.location && typeof place.location.lat === 'function' ? place.location.lat() : prev.lat,
-                lng: place.location && typeof place.location.lng === 'function' ? place.location.lng() : prev.lng
-              }));
+              setManualData((prev: any) => {
+                let newLat = prev.lat;
+                let newLng = prev.lng;
+                if (place.location) {
+                  newLat = typeof place.location.lat === 'function' ? place.location.lat() : (place.location.lat !== undefined ? place.location.lat : (place.location.latitude !== undefined ? place.location.latitude : prev.lat));
+                  newLng = typeof place.location.lng === 'function' ? place.location.lng() : (place.location.lng !== undefined ? place.location.lng : (place.location.longitude !== undefined ? place.location.longitude : prev.lng));
+                } else if (place.geometry?.location) {
+                  newLat = typeof place.geometry.location.lat === 'function' ? place.geometry.location.lat() : (place.geometry.location.lat !== undefined ? place.geometry.location.lat : prev.lat);
+                  newLng = typeof place.geometry.location.lng === 'function' ? place.geometry.location.lng() : (place.geometry.location.lng !== undefined ? place.geometry.location.lng : prev.lng);
+                }
+                
+                return {
+                  ...prev,
+                  address: place.formattedAddress || place.displayName || prev.address || '',
+                  lat: newLat,
+                  lng: newLng
+                };
+              });
             }
           };
 

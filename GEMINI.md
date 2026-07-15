@@ -54,3 +54,11 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 - **Legacy Trade-offs:** Avoid Legacy Google API endpoints (`maps/api/place/nearbysearch/*`) due to loss of phone numbers and enforced 2-second timeout suspensions required between page tokens.
 - **Solution:** Always utilize the **New `searchText`** endpoint which accepts `pageToken` and geographic limits (`locationRestriction`). This maintains response speed and robust metadata while simulating Area searches precisely.
 - **React Effect Unmounting:** Integrating leaflet/geoman drawing controls straight into React `useEffect` structures creates fatal sync issues. Always decouple the active configuration into refs `useRef()` that safely proxy events to avoid detachments mid-draw!
+
+### Session: Fixing Location Import & Geocoding Constraints
+**Changes Made:**
+1. **Assignments Table Deprecation Fix:** Updated the backend `confirm-import` route to query `grid_squares` instead of `assignments` when mapping bounds. The `assignments` table was previously dropped in favor of the new grid system, which caused "Import by Category" and "Import by Area" to fail with a `relation "assignments" does not exist` database error.
+2. **Robust Geocoding Extraction:** Updated the autocomplete address extraction logic on the frontend (`Map.tsx`) to be universally compatible with the varying structures provided by the legacy Maps library, Google Places REST API, and modern `google.maps.places.Place` objects. This resolves a bug where coordinate properties were mapped to `undefined` during autocomplete selection, yielding a `null value in column "lat"` Postgres exception when users attempted to manually add a location.
+
+**Difficulties Encountered:**
+- The new `PlaceAutocompleteElement` can yield varying representations of a `Place` object depending on what libraries are loaded, sometimes providing `.location` as a `google.maps.LatLng` (with functions like `.lat()`) and sometimes providing properties (like `.latitude`). Added explicit checks for both functional and property-based coordinate structures to prevent `undefined` properties from skipping geocoding validation.
