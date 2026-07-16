@@ -1091,12 +1091,6 @@ mainRouter.post('/api/locations/import-csv', authenticateToken, authorizeRoles('
         const apiKey = keyRes.rows[0]?.value;
 
         for (const row of rows) {
-            // 1. Check if location exists
-            const existing = await pool.query('SELECT id FROM locations WHERE address = $1', [row.address]);
-            if (existing.rows.length > 0) {
-                ignoredRows.push(row);
-                continue;
-            }
 
             // 2. Geocode
             let lat, lng, formattedAddress = row.address;
@@ -1156,7 +1150,33 @@ mainRouter.post('/api/locations/import-csv', authenticateToken, authorizeRoles('
                 }
             }
 
-            // 4. Insert
+            // 4. Check for duplicate / exact match
+            const existing = await pool.query('SELECT * FROM locations WHERE name = $1 AND address = $2', [row.name, formattedAddress]);
+            
+            if (existing.rows.length > 0) {
+                const dbRow = existing.rows[0];
+                
+                if ((dbRow.phone || '') === (row.phone || '') &&
+                    (dbRow.category || '') === (row.category || '') &&
+                    (dbRow.status || 'Unvisited') === (row.status || 'Unvisited') &&
+                    (dbRow.notes || '') === (row.notes || '') &&
+                    dbRow.assigned_volunteer_id === volunteerId) {
+                    
+                    // Exact duplicate
+                    ignoredRows.push(row);
+                    continue;
+                } else {
+                    // Update differing fields
+                    await pool.query(
+                        'UPDATE locations SET lat = $1, lng = $2, phone = $3, category = $4, status = $5, assigned_volunteer_id = $6, assignment_type = $7, notes = $8 WHERE id = $9',
+                        [lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType, row.notes || null, dbRow.id]
+                    );
+                    successCount++;
+                    continue;
+                }
+            }
+
+            // 5. Insert
             const insertResult = await pool.query(
                 'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (name, address) DO NOTHING RETURNING id',
                 [row.name, formattedAddress, lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType, row.notes || null]
