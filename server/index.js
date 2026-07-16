@@ -874,6 +874,23 @@ mainRouter.patch('/api/locations/:id/status', authenticateToken, async (req, res
     }
 });
 
+mainRouter.patch('/api/locations/:id/notes', authenticateToken, async (req, res) => {
+    const { notes } = req.body;
+    const locationId = req.params.id;
+
+    try {
+        const locRes = await pool.query('SELECT id FROM locations WHERE id = $1', [locationId]);
+        if (locRes.rows.length === 0) return res.status(404).json({ message: 'Location not found' });
+
+        await pool.query('UPDATE locations SET notes = $1 WHERE id = $2', [notes, locationId]);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { category, city = 'Lexington, KY' } = req.body;
     try {

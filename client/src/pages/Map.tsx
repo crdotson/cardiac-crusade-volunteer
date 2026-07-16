@@ -694,6 +694,15 @@ const Map: React.FC = () => {
     }
   };
 
+  const handleUpdateNotes = async (id: number, notes: string) => {
+    try {
+      await axios.patch(`api/locations/${id}/notes`, { notes });
+      fetchLocations();
+    } catch (err) {
+      console.error('Failed to update notes', err);
+    }
+  };
+
   const handleDeleteLocation = async (id: number) => {
     setLocationToDeleteId(id);
   };
@@ -849,9 +858,17 @@ const Map: React.FC = () => {
                         <span className="badge" style={{ backgroundColor: '#3498db' }}>{loc.assigned_volunteer_email}</span>
                       )}
                     </div>
-                    {loc.notes && (
-                      <p style={{ margin: '0 0 10px 0', fontSize: '0.8rem', fontStyle: 'italic' }}><strong>Notes:</strong> {loc.notes}</p>
-                    )}
+                    
+                    <div className="form-group" style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Notes</label>
+                      <textarea 
+                        key={`notes-${loc.id}`}
+                        defaultValue={loc.notes || ''} 
+                        onBlur={(e) => handleUpdateNotes(loc.id, e.target.value)}
+                        placeholder="Enter notes (click away to save)..."
+                        style={{ fontSize: '0.85rem', padding: '4px', marginBottom: 0, width: '100%', minHeight: '50px', resize: 'vertical' }}
+                      />
+                    </div>
                     
                     <div className="form-group" style={{ marginBottom: '10px' }}>
                       <label style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Status</label>

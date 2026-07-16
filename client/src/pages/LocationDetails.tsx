@@ -13,6 +13,7 @@ const LocationDetails: React.FC = () => {
   const [location, setLocation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [newStatus, setNewStatus] = useState('');
+  const [newNotes, setNewNotes] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [assignableUsers, setAssignableUsers] = useState<any[]>([]);
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
@@ -33,6 +34,7 @@ const LocationDetails: React.FC = () => {
       const res = await axios.get(`api/locations/${id}`);
       setLocation(res.data);
       setNewStatus(res.data.status);
+      setNewNotes(res.data.notes || '');
       setSelectedAssignee(res.data.assigned_volunteer_id || '');
     } catch (err) {
       console.error('Failed to fetch location', err);
@@ -85,6 +87,17 @@ const LocationDetails: React.FC = () => {
     }
   };
 
+  const updateNotes = async () => {
+    try {
+      await axios.patch(`api/locations/${id}/notes`, { notes: newNotes });
+      setLocation({ ...location, notes: newNotes });
+      alert('Notes updated successfully');
+    } catch (err) {
+      console.error('Failed to update notes', err);
+      alert('Failed to update notes.');
+    }
+  };
+
   const handleAssign = async () => {
     try {
       await axios.post(`api/locations/${id}/assign`, { volunteerId: selectedAssignee });
@@ -119,9 +132,6 @@ const LocationDetails: React.FC = () => {
               </span>
             </p>
             <p><strong>Assigned To:</strong> {location.volunteer_email || 'Unassigned'}</p>
-            {location.notes && (
-              <p><strong>Notes:</strong> {location.notes}</p>
-            )}
             
             <div style={{ marginTop: '2rem' }}>
               <a 
@@ -149,6 +159,19 @@ const LocationDetails: React.FC = () => {
                   ))}
                 </select>
                 <button className="primary" style={{ marginTop: '0.5rem' }} onClick={() => updateStatus(newStatus)}>Save Status</button>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '2rem' }}>
+              <h3>Update Notes</h3>
+              <div className="form-group">
+                <textarea 
+                  value={newNotes} 
+                  onChange={(e) => setNewNotes(e.target.value)} 
+                  placeholder="Enter notes..."
+                  style={{ width: '100%', minHeight: '80px', marginBottom: '0.5rem', resize: 'vertical' }}
+                />
+                <button className="primary" onClick={updateNotes}>Save Notes</button>
               </div>
             </div>
 

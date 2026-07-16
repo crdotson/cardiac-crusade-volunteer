@@ -67,6 +67,7 @@ const List: React.FC = () => {
                 <th>Name</th>
                 <th>Address</th>
                 <th>Category</th>
+                <th>Notes</th>
                 <th>Status</th>
                 <th>Assigned To</th>
                 <th>Actions</th>
@@ -78,6 +79,7 @@ const List: React.FC = () => {
                   <td>{loc.name}</td>
                   <td>{loc.address}</td>
                   <td>{formatCategoryName(loc.category)}</td>
+                  <td>{loc.notes}</td>
                   <td>
                     <span className={`badge status-${(loc.status || 'Pending').replace(/\s+/g, '-').toLowerCase()}`}>
                       {loc.status || 'Pending'}
@@ -93,7 +95,7 @@ const List: React.FC = () => {
               ))}
               {filteredLocations.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center' }}>No locations found.</td>
+                  <td colSpan={7} style={{ textAlign: 'center' }}>No locations found.</td>
                 </tr>
               )}
             </tbody>
