@@ -105,9 +105,12 @@ async function initDB() {
           category VARCHAR(100),
           assigned_volunteer_id INTEGER REFERENCES users(id),
           assigned_by_id INTEGER REFERENCES users(id),
-          assignment_type VARCHAR(50),
-          UNIQUE(name, address)
+          assignment_type VARCHAR(50)
         );
+      `);
+
+      await pool.query(`
+        ALTER TABLE locations DROP CONSTRAINT IF EXISTS locations_name_address_key;
       `);
 
       await pool.query(`
@@ -1032,11 +1035,14 @@ mainRouter.post('/api/locations/confirm-import', authenticateToken, authorizeRol
                 }
             }
 
-            await pool.query(
-                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (name, address) DO NOTHING',
-                [loc.name, loc.address, loc.lat, loc.lng, loc.phone, loc.category, 'Unvisited', assignedVolunteerId, assignmentType]
-            );
-            importedCount++;
+            const existing = await pool.query('SELECT id FROM locations WHERE name = $1 AND address = $2', [loc.name, loc.address]);
+            if (existing.rows.length === 0) {
+                await pool.query(
+                    'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                    [loc.name, loc.address, loc.lat, loc.lng, loc.phone, loc.category, 'Unvisited', assignedVolunteerId, assignmentType]
+                );
+                importedCount++;
+            }
         }
         res.json({ success: true, importedCount });
     } catch (err) {
@@ -1153,39 +1159,33 @@ mainRouter.post('/api/locations/import-csv', authenticateToken, authorizeRoles('
             // 4. Check for duplicate / exact match
             const existing = await pool.query('SELECT * FROM locations WHERE name = $1 AND address = $2', [row.name, formattedAddress]);
             
+            let isExactMatch = false;
             if (existing.rows.length > 0) {
-                const dbRow = existing.rows[0];
-                
-                if ((dbRow.phone || '') === (row.phone || '') &&
-                    (dbRow.category || '') === (row.category || '') &&
-                    (dbRow.status || 'Unvisited') === (row.status || 'Unvisited') &&
-                    (dbRow.notes || '') === (row.notes || '') &&
-                    dbRow.assigned_volunteer_id === volunteerId) {
-                    
-                    // Exact duplicate
-                    ignoredRows.push(row);
-                    continue;
-                } else {
-                    // Update differing fields
-                    await pool.query(
-                        'UPDATE locations SET lat = $1, lng = $2, phone = $3, category = $4, status = $5, assigned_volunteer_id = $6, assignment_type = $7, notes = $8 WHERE id = $9',
-                        [lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType, row.notes || null, dbRow.id]
-                    );
-                    successCount++;
-                    continue;
+                for (const dbRow of existing.rows) {
+                    if ((dbRow.phone || '') === (row.phone || '') &&
+                        (dbRow.category || '') === (row.category || '') &&
+                        (dbRow.status || 'Unvisited') === (row.status || 'Unvisited') &&
+                        (dbRow.notes || '') === (row.notes || '') &&
+                        dbRow.assigned_volunteer_id === volunteerId) {
+                        
+                        isExactMatch = true;
+                        break;
+                    }
                 }
             }
 
-            // 5. Insert
-            const insertResult = await pool.query(
-                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (name, address) DO NOTHING RETURNING id',
+            if (isExactMatch) {
+                // Exact duplicate found, ignore
+                ignoredRows.push(row);
+                continue;
+            }
+
+            // 5. Insert (create a new location even if name/address exist, since fields differ)
+            await pool.query(
+                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
                 [row.name, formattedAddress, lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType, row.notes || null]
             );
-            if (insertResult.rows.length === 0) {
-                ignoredRows.push(row);
-            } else {
-                successCount++;
-            }
+            successCount++;
         }
 
         res.json({
