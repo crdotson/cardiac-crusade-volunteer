@@ -1157,11 +1157,15 @@ mainRouter.post('/api/locations/import-csv', authenticateToken, authorizeRoles('
             }
 
             // 4. Insert
-            await pool.query(
-                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+            const insertResult = await pool.query(
+                'INSERT INTO locations (name, address, lat, lng, phone, category, status, assigned_volunteer_id, assignment_type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (name, address) DO NOTHING RETURNING id',
                 [row.name, formattedAddress, lat, lng, row.phone || null, row.category || null, row.status || 'Unvisited', volunteerId, finalAssignmentType, row.notes || null]
             );
-            successCount++;
+            if (insertResult.rows.length === 0) {
+                ignoredRows.push(row);
+            } else {
+                successCount++;
+            }
         }
 
         res.json({
