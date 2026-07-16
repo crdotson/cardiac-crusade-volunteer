@@ -87,11 +87,10 @@ const LocationDetails: React.FC = () => {
     }
   };
 
-  const updateNotes = async () => {
+  const updateNotes = async (notesToSave: string) => {
     try {
-      await axios.patch(`api/locations/${id}/notes`, { notes: newNotes });
-      setLocation({ ...location, notes: newNotes });
-      alert('Notes updated successfully');
+      await axios.patch(`api/locations/${id}/notes`, { notes: notesToSave });
+      setLocation({ ...location, notes: notesToSave });
     } catch (err) {
       console.error('Failed to update notes', err);
       alert('Failed to update notes.');
@@ -158,7 +157,6 @@ const LocationDetails: React.FC = () => {
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
-                <button className="primary" style={{ marginTop: '0.5rem' }} onClick={() => updateStatus(newStatus)}>Save Status</button>
               </div>
             </div>
 
@@ -168,10 +166,10 @@ const LocationDetails: React.FC = () => {
                 <textarea 
                   value={newNotes} 
                   onChange={(e) => setNewNotes(e.target.value)} 
-                  placeholder="Enter notes..."
+                  onBlur={(e) => updateNotes(e.target.value)}
+                  placeholder="Enter notes (click away to save)..."
                   style={{ width: '100%', minHeight: '80px', marginBottom: '0.5rem', resize: 'vertical' }}
                 />
-                <button className="primary" onClick={updateNotes}>Save Notes</button>
               </div>
             </div>
 
