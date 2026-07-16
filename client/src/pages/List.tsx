@@ -39,7 +39,7 @@ const List: React.FC = () => {
                         (loc.address || '').toLowerCase().includes(filterText.toLowerCase());
     const matchesCat = filterCategory === 'All' || loc.category === filterCategory;
     return matchesText && matchesCat;
-  });
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
     <div className="container">
