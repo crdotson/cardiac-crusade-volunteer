@@ -2,13 +2,42 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import CreateImportActions from '../components/CreateImportActions';
+import { useAuth } from '../context/AuthContext';
+import confetti from 'canvas-confetti';
 
 const List: React.FC = () => {
+  const { user } = useAuth();
+  const showAssignedTo = user?.role !== 'Volunteer';
   const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterText, setFilterText] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
   const navigate = useNavigate();
+
+  const statuses = [
+    'Unvisited',
+    'AED status unknown - Follow-up',
+    'AED located and mapped at aed.new - Done',
+    'Refused or requested not to be mapped - Done',
+    'AED located, not mapped yet - Follow up',
+    'AED not present - Done'
+  ];
+
+  const handleUpdateStatus = async (id: number, status: string) => {
+    try {
+      await axios.patch(`api/locations/${id}/status`, { status });
+      if (status.includes('Done')) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+      fetchLocations();
+    } catch (err) {
+      console.error('Failed to update status', err);
+    }
+  };
 
   const fetchLocations = async () => {
     try {
@@ -44,8 +73,8 @@ const List: React.FC = () => {
   }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
-    <div className="container">
-      <div className="card">
+    <div className="container list-container">
+      <div className="card list-card">
         <h2 style={{ color: 'var(--primary-color)' }}>Locations List</h2>
         <CreateImportActions onUpdate={fetchLocations} />
         <div className="filter-toolbar">
@@ -72,7 +101,7 @@ const List: React.FC = () => {
                 <th>Category</th>
                 <th>Notes</th>
                 <th>Status</th>
-                <th>Assigned To</th>
+                {showAssignedTo && <th>Assigned To</th>}
                 <th>Actions</th>
               </tr>
             </thead>
@@ -84,11 +113,31 @@ const List: React.FC = () => {
                   <td>{formatCategoryName(loc.category)}</td>
                   <td>{loc.notes}</td>
                   <td>
-                    <span className={`badge status-${(loc.status || 'Pending').replace(/\s+/g, '-').toLowerCase()}`}>
-                      {loc.status || 'Pending'}
-                    </span>
+                    <select
+                      key={`${loc.id}-${loc.status}`}
+                      defaultValue={loc.status || 'Unvisited'}
+                      onChange={(e) => handleUpdateStatus(loc.id, e.target.value)}
+                      style={{ 
+                        fontSize: '0.85rem', 
+                        padding: '4px', 
+                        marginBottom: 0, 
+                        width: 'auto', 
+                        maxWidth: '220px',
+                        color: '#333', 
+                        backgroundColor: '#fff', 
+                        border: '1px solid #ccc', 
+                        borderRadius: '4px' 
+                      }}
+                    >
+                      {loc.status && !statuses.includes(loc.status) && (
+                        <option key={loc.status} value={loc.status}>{loc.status}</option>
+                      )}
+                      {statuses.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </td>
-                  <td>{loc.assigned_volunteer_email || 'Unassigned'}</td>
+                  {showAssignedTo && <td>{loc.assigned_volunteer_email || 'Unassigned'}</td>}
                   <td>
                     <button onClick={() => navigate(`/locations/${loc.id}`)} className="secondary" style={{ padding: '0.25rem 0.5rem' }}>
                       Details
@@ -98,7 +147,7 @@ const List: React.FC = () => {
               ))}
               {filteredLocations.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center' }}>No locations found.</td>
+                  <td colSpan={showAssignedTo ? 7 : 6} style={{ textAlign: 'center' }}>No locations found.</td>
                 </tr>
               )}
             </tbody>

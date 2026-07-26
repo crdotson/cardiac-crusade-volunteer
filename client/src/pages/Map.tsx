@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Rectangle, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -217,6 +218,13 @@ const Map: React.FC = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvImportResults, setCsvImportResults] = useState<any>(null);
+
+  const [navbarActionsEl, setNavbarActionsEl] = useState<HTMLElement | null>(() => document.getElementById('navbar-actions'));
+  useEffect(() => {
+    if (!navbarActionsEl) {
+      setNavbarActionsEl(document.getElementById('navbar-actions'));
+    }
+  }, [navbarActionsEl]);
 
   // Stable script loader
   useEffect(() => {
@@ -825,47 +833,44 @@ const Map: React.FC = () => {
       </div>
       )}
 
-      {!isPrivilegedUser && (
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <button 
-                onClick={() => {
-                  if (isClaimingMode) {
-                    handleSaveClaims();
-                  } else {
-                    const initialOwned = new Set<number>(
-                      grids.filter(g => String(g.assigned_volunteer_id) === String(user?.id)).map(g => Number(g.id))
-                    );
-                    setPendingClaimGrids(initialOwned);
-                    setIsClaimingMode(true);
-                  }
-                }}
-                style={{ backgroundColor: isClaimingMode ? 'green' : 'var(--primary-color)' }}
-              >
-                {isClaimingMode ? 'Save Claims' : 'Claim/Unclaim Squares'}
-              </button>
-              {isClaimingMode && (
-                <button 
-                  className="secondary" 
-                  onClick={() => {
-                    setIsClaimingMode(false);
-                    setPendingClaimGrids(new Set());
-                  }}
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-            <div>
-              <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                {isClaimingMode 
-                  ? 'Click grid squares on the map to select or deselect them, then click "Save Claims".' 
-                  : 'Click "Claim/Unclaim Squares" to manage your volunteer territory.'}
-              </span>
-            </div>
-          </div>
-        </div>
+      {!isPrivilegedUser && navbarActionsEl && createPortal(
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button 
+            onClick={() => {
+              if (isClaimingMode) {
+                handleSaveClaims();
+              } else {
+                const initialOwned = new Set<number>(
+                  grids.filter(g => String(g.assigned_volunteer_id) === String(user?.id)).map(g => Number(g.id))
+                );
+                setPendingClaimGrids(initialOwned);
+                setIsClaimingMode(true);
+              }
+            }}
+            style={{ 
+              backgroundColor: isClaimingMode ? 'green' : 'var(--primary-color)',
+              padding: '0.25rem 0.6rem',
+              fontSize: '0.85rem',
+              marginBottom: 0,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {isClaimingMode ? 'Save Claims' : 'Claim Squares'}
+          </button>
+          {isClaimingMode && (
+            <button 
+              className="secondary" 
+              onClick={() => {
+                setIsClaimingMode(false);
+                setPendingClaimGrids(new Set());
+              }}
+              style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem', marginBottom: 0 }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>,
+        navbarActionsEl
       )}
 
       <div className={isFullscreen ? "" : "card"} style={isFullscreen ? {position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, padding: 0, background: '#fff'} : { padding: 0, height: '70vh', position: 'relative' }}>
@@ -921,7 +926,6 @@ const Map: React.FC = () => {
                      
                      if (!isPrivileged) {
                          if (!isClaimingMode) {
-                             alert('Please click "Claim/Unclaim Squares" above before selecting squares on the map.');
                              return;
                          }
                          if (grid.assigned_volunteer_id && String(grid.assigned_volunteer_id) !== String(user?.id)) {
@@ -961,10 +965,33 @@ const Map: React.FC = () => {
             const isAssignedToSelected = selectedVolunteer && Number(loc.assigned_volunteer_id) === Number(selectedVolunteer);
             return (
               <Marker 
-                key={loc.id} 
+                key={`${loc.id}-${isClaimingMode}`} 
                 position={[loc.lat, loc.lng]} 
                 icon={CustomMarkerIcon(getStatusColor(loc.status, !!loc.assigned_volunteer_id), !!isAssignedToSelected)}
+                interactive={!isClaimingMode}
+                eventHandlers={{
+                  click: () => {
+                    if (isClaimingMode) {
+                      const grid = grids.find(g => loc.lat >= g.south && loc.lat <= g.north && loc.lng >= g.west && loc.lng <= g.east);
+                      if (grid) {
+                        const gridIdNum = Number(grid.id);
+                        if (grid.assigned_volunteer_id && String(grid.assigned_volunteer_id) !== String(user?.id)) {
+                          alert('This grid square is already assigned to another volunteer.');
+                          return;
+                        }
+                        const next = new Set(pendingClaimGrids);
+                        if (next.has(gridIdNum)) {
+                          next.delete(gridIdNum);
+                        } else {
+                          next.add(gridIdNum);
+                        }
+                        setPendingClaimGrids(next);
+                      }
+                    }
+                  }
+                }}
               >
+                {!isClaimingMode && (
                 <Popup>
                   <div className="popup-content" style={{ minWidth: '200px' }}>
                     <h3 style={{ margin: '0 0 5px 0', fontSize: '1rem' }}>{loc.name}</h3>
@@ -1038,6 +1065,7 @@ const Map: React.FC = () => {
                     </div>
                   </div>
                 </Popup>
+                )}
 
               </Marker>
             );

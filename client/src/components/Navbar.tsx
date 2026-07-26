@@ -29,7 +29,6 @@ const Navbar: React.FC = () => {
         <span className="user-role">({user.role})</span>
         <Link to="/settings" title={`Settings (v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''})`} className="settings-link" style={{ display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
           <span style={{ fontSize: '1.2rem' }}>⚙️</span>
-          <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 500 }}>{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''}</span>
         </Link>
         <button onClick={handleLogout} className="secondary logout-button" title="Logout">
           <span className="logout-text">Logout</span>
@@ -52,6 +51,7 @@ const Navbar: React.FC = () => {
         <li>
           <Link to="/reporting" className={isActive('/reporting')}>Reporting</Link>
         </li>
+        <li id="navbar-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}></li>
       </ul>
     </nav>
   );
