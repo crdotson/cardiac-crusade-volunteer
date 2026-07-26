@@ -6,6 +6,7 @@ import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import Papa from 'papaparse';
 
@@ -170,11 +171,14 @@ const getPulsePointLink = () => {
 
 const Map: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [selectedVolunteer, setSelectedVolunteer] = useState<string>('');
   const [grids, setGrids] = useState<any[]>([]);
+  const [isClaimingMode, setIsClaimingMode] = useState(false);
+  const [pendingClaimGrids, setPendingClaimGrids] = useState<Set<number>>(new Set());
   const [showImport, setShowImport] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -382,6 +386,12 @@ const Map: React.FC = () => {
     fetchSettings();
     fetchGrids();
   }, [user]);
+
+  useEffect(() => {
+    if (location.state && (location.state as any).activeTool) {
+      setActiveTool((location.state as any).activeTool);
+    }
+  }, [location.state]);
 
   const handleGridAreaCreated = async (bounds: L.LatLngBounds) => {
     setGridPromptBounds(bounds);
@@ -741,6 +751,33 @@ const Map: React.FC = () => {
       return matchesText && matchesCat;
     });
 
+  const handleSaveClaims = async () => {
+    const initialOwned = new Set<number>(
+      grids.filter(g => String(g.assigned_volunteer_id) === String(user?.id)).map(g => Number(g.id))
+    );
+    
+    const toClaim = [...pendingClaimGrids].filter(id => !initialOwned.has(id));
+    const toUnclaim = [...initialOwned].filter(id => !pendingClaimGrids.has(id));
+    
+    if (toClaim.length === 0 && toUnclaim.length === 0) {
+      setIsClaimingMode(false);
+      return;
+    }
+
+    try {
+      const claimPromises = toClaim.map(id => axios.post(`api/grids/${id}/assign`, { volunteerId: user?.id }));
+      const unclaimPromises = toUnclaim.map(id => axios.post(`api/grids/${id}/assign`, { volunteerId: null }));
+      
+      await Promise.all([...claimPromises, ...unclaimPromises]);
+      setIsClaimingMode(false);
+      fetchGrids();
+      fetchLocations();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update square claims.');
+      console.error('Error saving claims:', err);
+    }
+  };
+
   const isPrivilegedUser = ['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user?.role || '');
 
   return (
@@ -788,6 +825,49 @@ const Map: React.FC = () => {
       </div>
       )}
 
+      {!isPrivilegedUser && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button 
+                onClick={() => {
+                  if (isClaimingMode) {
+                    handleSaveClaims();
+                  } else {
+                    const initialOwned = new Set<number>(
+                      grids.filter(g => String(g.assigned_volunteer_id) === String(user?.id)).map(g => Number(g.id))
+                    );
+                    setPendingClaimGrids(initialOwned);
+                    setIsClaimingMode(true);
+                  }
+                }}
+                style={{ backgroundColor: isClaimingMode ? 'green' : 'var(--primary-color)' }}
+              >
+                {isClaimingMode ? 'Save Claims' : 'Claim/Unclaim Squares'}
+              </button>
+              {isClaimingMode && (
+                <button 
+                  className="secondary" 
+                  onClick={() => {
+                    setIsClaimingMode(false);
+                    setPendingClaimGrids(new Set());
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            <div>
+              <span style={{ fontSize: '0.9rem', color: '#666' }}>
+                {isClaimingMode 
+                  ? 'Click grid squares on the map to select or deselect them, then click "Save Claims".' 
+                  : 'Click "Claim/Unclaim Squares" to manage your volunteer territory.'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={isFullscreen ? "" : "card"} style={isFullscreen ? {position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, padding: 0, background: '#fff'} : { padding: 0, height: '70vh', position: 'relative' }}>
         <button 
           onClick={() => setIsFullscreen(!isFullscreen)} 
@@ -801,24 +881,61 @@ const Map: React.FC = () => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {grids.map((grid) => {
+            const gridIdNum = Number(grid.id);
             const gridColor = getVolunteerColor(grid.assigned_volunteer_email);
+            const isOwnedByMe = String(grid.assigned_volunteer_id) === String(user?.id);
+            const isOwnedByOther = grid.assigned_volunteer_id && !isOwnedByMe;
+
+            let pathColor = grid.assigned_volunteer_id ? gridColor : 'gray';
+            let pathOpacity = grid.assigned_volunteer_id ? 0.35 : 0.1;
+            let pathWeight = grid.assigned_volunteer_id ? 2 : 1;
+
+            if (!isPrivilegedUser && isClaimingMode) {
+              if (isOwnedByOther) {
+                pathColor = gridColor;
+                pathOpacity = 0.35;
+                pathWeight = 2;
+              } else if (pendingClaimGrids.has(gridIdNum)) {
+                pathColor = getVolunteerColor(user?.email || '');
+                pathOpacity = 0.5;
+                pathWeight = 3;
+              } else {
+                pathColor = 'gray';
+                pathOpacity = 0.1;
+                pathWeight = 1;
+              }
+            }
+
             return (
             <Rectangle 
               key={grid.id} 
               bounds={[[grid.south, grid.west], [grid.north, grid.east]]}
               pathOptions={{ 
-                 color: grid.assigned_volunteer_id ? gridColor : 'gray', 
-                 fillOpacity: grid.assigned_volunteer_id ? 0.35 : 0.1,
-                 weight: grid.assigned_volunteer_id ? 2 : 1
+                 color: pathColor, 
+                 fillOpacity: pathOpacity,
+                 weight: pathWeight
               }}
               eventHandlers={{
                  click: async () => {
                      const isPrivileged = ['Application Administrator', 'City Coordinator', 'Volunteer leader'].includes(user?.role || '');
                      
                      if (!isPrivileged) {
-                         if (grid.assigned_volunteer_id && String(grid.assigned_volunteer_id) !== String(user?.id)) {
-                             return; // Grid is owned by someone else; do nothing.
+                         if (!isClaimingMode) {
+                             alert('Please click "Claim/Unclaim Squares" above before selecting squares on the map.');
+                             return;
                          }
+                         if (grid.assigned_volunteer_id && String(grid.assigned_volunteer_id) !== String(user?.id)) {
+                             alert('This grid square is already assigned to another volunteer.');
+                             return;
+                         }
+                         const next = new Set(pendingClaimGrids);
+                         if (next.has(gridIdNum)) {
+                             next.delete(gridIdNum);
+                         } else {
+                             next.add(gridIdNum);
+                         }
+                         setPendingClaimGrids(next);
+                         return;
                      }
 
                      const targetVolunteer = isPrivileged 

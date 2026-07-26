@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import CreateImportActions from '../components/CreateImportActions';
 
 const List: React.FC = () => {
   const [locations, setLocations] = useState<any[]>([]);
@@ -32,11 +33,12 @@ const List: React.FC = () => {
                .join(' ');
   };
 
-  if (loading) return <div className="container">Loading...</div>;
+  if (loading) return <div className="container"><p>Loading locations...</p></div>;
 
   const filteredLocations = locations.filter(loc => {
     const matchesText = (loc.name || '').toLowerCase().includes(filterText.toLowerCase()) || 
-                        (loc.address || '').toLowerCase().includes(filterText.toLowerCase());
+                        (loc.address || '').toLowerCase().includes(filterText.toLowerCase()) ||
+                        (loc.notes || '').toLowerCase().includes(filterText.toLowerCase());
     const matchesCat = filterCategory === 'All' || loc.category === filterCategory;
     return matchesText && matchesCat;
   }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -45,6 +47,7 @@ const List: React.FC = () => {
     <div className="container">
       <div className="card">
         <h2 style={{ color: 'var(--primary-color)' }}>Locations List</h2>
+        <CreateImportActions onUpdate={fetchLocations} />
         <div className="filter-toolbar">
           <input 
             type="text" 

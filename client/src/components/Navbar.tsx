@@ -27,8 +27,9 @@ const Navbar: React.FC = () => {
       <div className="nav-user-controls">
         <span className="user-email">{user.email}</span>
         <span className="user-role">({user.role})</span>
-        <Link to="/settings" title="Settings" className="settings-link">
+        <Link to="/settings" title={`Settings (v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''})`} className="settings-link" style={{ display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
           <span style={{ fontSize: '1.2rem' }}>⚙️</span>
+          <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 500 }}>{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''}</span>
         </Link>
         <button onClick={handleLogout} className="secondary logout-button" title="Logout">
           <span className="logout-text">Logout</span>
