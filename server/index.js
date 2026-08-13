@@ -1430,9 +1430,9 @@ mainRouter.get('/api/reporting/metrics', authenticateToken, async (req, res) => 
             SELECT 
                 assigned_volunteer_id,
                 COUNT(*) as total,
-                COUNT(*) FILTER (WHERE status = 'AED Located and Mapped - Done') as mapped,
-                COUNT(*) FILTER (WHERE status != 'AED Located and Mapped - Done' AND status != 'Pending') as in_progress,
-                COUNT(*) FILTER (WHERE status = 'Pending') as pending
+                COUNT(*) FILTER (WHERE status ILIKE '%Done%' OR status = 'Already Has AED' OR status = 'Refused/Not Interested') as done,
+                COUNT(*) FILTER (WHERE status ILIKE '%Follow-up%' OR status ILIKE '%Follow up%' OR status = 'Left Literature' OR status = 'Engaged/No Answer' OR status = 'Interested') as followup,
+                COUNT(*) FILTER (WHERE status = 'Unvisited' OR status = 'Pending') as unvisited
             FROM locations
             WHERE assigned_volunteer_id = ANY($1)
             GROUP BY assigned_volunteer_id
@@ -1445,7 +1445,7 @@ mainRouter.get('/api/reporting/metrics', authenticateToken, async (req, res) => 
 
         const report = users.map(u => ({
             ...u,
-            metrics: metricsMap[u.id] || { total: 0, mapped: 0, in_progress: 0, pending: 0 }
+            metrics: metricsMap[u.id] || { total: 0, done: 0, followup: 0, unvisited: 0 }
         }));
 
         res.json(report);
