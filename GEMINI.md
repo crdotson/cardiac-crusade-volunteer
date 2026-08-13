@@ -102,3 +102,14 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 1. **Reporting Metrics Bucketing**: Modified the `/api/reporting/metrics` SQL query in `server/index.js` to categorize location statuses into three semantic buckets: `Done` (locations with a status including "Done", "Already Has AED", or "Refused"), `Followup` (locations with "Follow-up", "Follow up", "In progress", "Engaged", etc.), and `Unvisited` ("Unvisited" or "Pending" locations).
 2. **Reporting Dashboard UI**: Rewrote `client/src/pages/Reporting.tsx` to align with the new reporting columns (`Done`, `Followup`, `Unvisited`). Updated the progress bar graphic to map explicitly to `Done / Total`. Removed the `Role` column from the table.
 3. **Hierarchical Team View**: Added an "Individual / Team" view mode slider to the Reporting dashboard. When "Individual" is selected, metrics are shown per individual directly. When "Team" is selected, the application dynamically aggregates and sums metrics for City Coordinators and Volunteer Leaders, rolling up all locations assigned to users lower in their hierarchy into their single row. Volunteer-level users are hidden from the table in Team view.
+
+### Session: Local Development Environment Setup
+**Changes Made:**
+1. **Local Automation Script:** Created `start_local_dev.sh` to automate port forwarding (`kubectl port-forward`) to the Kubernetes test database (`cardiac-crusade-db`) and spin up the Node.js backend.
+2. **Port Conflict Resolution:** Fixed `EADDRINUSE` errors on port `3000` by updating the local script to run the backend on an ephemeral random port (`32973`) instead.
+3. **Vite Development Proxy:** Configured the Vite development server (`vite.config.ts`) with a `rewrite` proxy rule so frontend API calls to `/api/...` on `localhost:5173` are automatically proxied to `/cardiac-crusade/api/...` on the local Node.js backend.
+4. **Router & API Basename Adjustments:** Updated `App.tsx` and `AuthContext.tsx` to conditionally utilize the root path (`/`) instead of `/cardiac-crusade/` when `import.meta.env.DEV` is true. This ensures the React Router matches correctly when testing the app at `http://localhost:5173/`.
+5. **Git Hygiene:** Cleaned up unused test scripts (`test_import.cjs`, `update_db.js`) and added `*.csv` to `.gitignore`.
+
+**Difficulties Encountered:**
+- **Proxy and Route Prefix Mismatches:** The backend natively mounts all routes under `/cardiac-crusade` (`process.env.BASE_PATH` fallback). When we switched the frontend to use `/` locally, API requests hit the proxy as `/api/login` instead of `/cardiac-crusade/api/login`, resulting in 404s. **Solution:** Configured Vite's `server.proxy` with a `rewrite` rule to transparently prefix `/cardiac-crusade/` onto the URL before sending it to the backend.
