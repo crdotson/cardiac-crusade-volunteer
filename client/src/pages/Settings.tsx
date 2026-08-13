@@ -127,9 +127,6 @@ const Settings: FC = () => {
     <div className="container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
         <h2 style={{ color: 'var(--primary-color)', margin: 0 }}>Settings</h2>
-        <span style={{ fontSize: '0.9rem', color: 'var(--gray)', fontWeight: 500 }}>
-          Version: <strong>{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''}</strong>
-        </span>
       </div>
       {error && <div className="error-message">{error}</div>}
       {message && <div className="success-message">{message}</div>}

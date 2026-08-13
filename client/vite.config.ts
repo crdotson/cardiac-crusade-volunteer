@@ -22,6 +22,15 @@ export default defineConfig(({ mode }) => {
     base: './',
     define: {
       '__APP_VERSION__': JSON.stringify(getVersionDate())
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:32973',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '/cardiac-crusade/api')
+        }
+      }
     }
   };
 });
