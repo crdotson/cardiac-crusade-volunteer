@@ -29,7 +29,7 @@ const Reporting: React.FC = () => {
   const totalLocations = metrics.reduce((acc, m) => acc + parseInt(m.metrics.total || 0), 0);
   const completionRate = totalLocations > 0 ? (totalDone / totalLocations * 100).toFixed(1) : 0;
 
-  let displayMetrics = metrics;
+  let displayMetrics = [...metrics];
 
   if (viewMode === 'Team') {
     // 1. Filter out volunteers
@@ -78,10 +78,38 @@ const Reporting: React.FC = () => {
     });
   }
 
+  // Sort displayMetrics by Done descending
+  displayMetrics.sort((a, b) => parseInt(b.metrics.done || 0) - parseInt(a.metrics.done || 0));
+
   return (
     <div className="container">
       <div className="card">
-        <h2>Reporting Dashboard</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <h2 style={{ margin: 0 }}>Reporting Dashboard</h2>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: '#f9f9f9', padding: '0.5rem 1rem', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.9rem', color: viewMode === 'Individual' ? '#000' : '#888', fontWeight: viewMode === 'Individual' ? 'bold' : 'normal' }}>Individual</span>
+            <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', margin: 0 }}>
+              <input 
+                type="checkbox" 
+                style={{ opacity: 0, width: 0, height: 0 }}
+                checked={viewMode === 'Team'}
+                onChange={(e) => setViewMode(e.target.checked ? 'Team' : 'Individual')}
+              />
+              <span style={{
+                position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: viewMode === 'Team' ? '#007bff' : '#ccc', transition: '.4s', borderRadius: '24px'
+              }}>
+                <span style={{
+                  position: 'absolute', height: '18px', width: '18px', left: '3px', bottom: '3px',
+                  backgroundColor: 'white', transition: '.4s', borderRadius: '50%',
+                  transform: viewMode === 'Team' ? 'translateX(20px)' : 'translateX(0)'
+                }}></span>
+              </span>
+            </label>
+            <span style={{ fontSize: '0.9rem', color: viewMode === 'Team' ? '#000' : '#888', fontWeight: viewMode === 'Team' ? 'bold' : 'normal' }}>Team</span>
+          </div>
+        </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
           <div className="card" style={{ textAlign: 'center', backgroundColor: '#f0f0f0' }}>
@@ -98,32 +126,6 @@ const Reporting: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h3 style={{ margin: 0 }}>Hierarchical Performance</h3>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#f9f9f9', padding: '0.5rem 1rem', borderRadius: '5px' }}>
-            <strong>View Mode:</strong>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-              <input 
-                type="radio" 
-                name="viewMode" 
-                checked={viewMode === 'Individual'} 
-                onChange={() => setViewMode('Individual')} 
-              />
-              Individual
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-              <input 
-                type="radio" 
-                name="viewMode" 
-                checked={viewMode === 'Team'} 
-                onChange={() => setViewMode('Team')} 
-              />
-              Team
-            </label>
-          </div>
-        </div>
-        
         <div style={{ overflowX: 'auto' }}>
           <table>
             <thead>
@@ -147,8 +149,17 @@ const Reporting: React.FC = () => {
                     <td>{m.metrics.followup}</td>
                     <td>{m.metrics.unvisited}</td>
                     <td>
-                      <div style={{ width: '100px', backgroundColor: '#eee', height: '10px', borderRadius: '5px' }}>
-                        <div style={{ width: `${prog}%`, backgroundColor: 'green', height: '100%', borderRadius: '5px' }}></div>
+                      <div style={{ width: '120px', backgroundColor: '#fee2e2', height: '12px', borderRadius: '6px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <div style={{ width: `${Math.max(0, Math.min(100, prog))}%`, backgroundColor: '#ef4444', height: '100%', borderRadius: '6px', position: 'relative', minWidth: prog > 0 ? '6px' : '0' }}>
+                          {prog > 0 && (
+                            <div style={{ position: 'absolute', right: '-8px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg viewBox="0 0 24 24" width="20" height="20" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.3))' }}>
+                                <path fill="#ef4444" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                <path fill="white" d="M13 7l-3.5 5.5h3l-1 4.5 4.5-6h-3l1.5-4z"/>
+                              </svg>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

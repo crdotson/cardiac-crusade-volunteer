@@ -263,7 +263,7 @@ const Users: React.FC = () => {
                 <td style={{ padding: '1rem' }}>{u.name || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>N/A</span>}</td>
                 <td style={{ padding: '1rem' }}>{u.role}</td>
                 <td style={{ padding: '1rem' }}>
-                  {u.roll_up_to_email || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>(will not be included in reporting)</span>}
+                  {u.roll_up_to_email || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>N/A</span>}
                 </td>
                 <td style={{ padding: '1rem' }}>
                   <button className="button secondary small" onClick={() => setEditingUser(u)}>Edit</button>
