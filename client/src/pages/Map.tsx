@@ -903,7 +903,7 @@ const Map: React.FC = () => {
           {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
         </button>
         <MapContainer center={[38.0406, -84.5037]} zoom={13} style={{ height: '100%', width: '100%' }}>
-          <MapCenterUpdater centerString={settings?.default_map_center || '38.0406, -84.5037'} />
+          {settings && <MapCenterUpdater centerString={settings.default_map_center || '38.0406, -84.5037'} />}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
