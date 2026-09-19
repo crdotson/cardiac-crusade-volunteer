@@ -33,7 +33,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
 
   // Category Import state
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [importCity, setImportCity] = useState('Lexington, KY');
+  const [importLocation, setImportLocation] = useState('38.0406, -84.5037');
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<number>>(new Set());
   const [filterText, setFilterText] = useState('');
@@ -66,8 +66,8 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
         if (volsRes.data) setVolunteers(volsRes.data);
         if (settsRes.data) {
           setSettings(settsRes.data);
-          if (settsRes.data.default_origin_city) {
-            setImportCity(settsRes.data.default_origin_city);
+          if (settsRes.data.default_map_center) {
+            setImportLocation(settsRes.data.default_map_center);
           }
         }
       } catch (err) {
@@ -109,14 +109,15 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
           const autocomplete = new PlaceAutocompleteElement();
           autocomplete.style.width = '100%';
 
-          if (settings?.default_origin_city) {
-            const { Geocoder } = await g.maps.importLibrary("geocoding");
-            const geocoder = new Geocoder();
-            geocoder.geocode({ address: settings.default_origin_city }, (results: any, status: any) => {
-              if (status === 'OK' && results?.[0]?.geometry?.viewport) {
-                autocomplete.locationBias = results[0].geometry.viewport;
+          if (settings?.default_map_center) {
+            try {
+              const parts = settings.default_map_center.split(',').map((s: string) => parseFloat(s.trim()));
+              if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                autocomplete.locationBias = { center: { lat: parts[0], lng: parts[1] }, radius: 50000 };
               }
-            });
+            } catch (e) {
+               console.error('Invalid default_map_center');
+            }
           }
 
           const handlePlaceSelect = async (e: any) => {
@@ -186,7 +187,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
     try {
       const res = await axios.post('api/locations/search', {
         category: selectedCategory,
-        city: importCity
+        city: importLocation
       });
       setCandidates(res.data);
       setSelectedCandidates(new Set(res.data.map((_: any, i: number) => i)));
@@ -369,8 +370,8 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>City/State</label>
-                  <input type="text" value={importCity} onChange={(e) => setImportCity(e.target.value)} />
+                  <label>Search Location (City or Lat/Lng)</label>
+                  <input type="text" value={importLocation} onChange={(e) => setImportLocation(e.target.value)} />
                 </div>
                 {isImporting ? (
                   <p>Searching... Please wait.</p>

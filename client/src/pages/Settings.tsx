@@ -8,7 +8,7 @@ const Settings: FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [googleApiKey, setGoogleApiKey] = useState('');
   const [googlePlacesLimit, setGooglePlacesLimit] = useState('10');
-  const [defaultOriginCity, setDefaultOriginCity] = useState('');
+  const [defaultMapCenter, setDefaultMapCenter] = useState('');
   const [credentials, setCredentials] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -19,7 +19,7 @@ const Settings: FC = () => {
       const res = await axios.get('api/settings');
       setGoogleApiKey(res.data.google_api_key || '');
       setGooglePlacesLimit(res.data.google_places_limit || '10');
-      setDefaultOriginCity(res.data.default_origin_city || 'Lexington, KY');
+      setDefaultMapCenter(res.data.default_map_center || '38.0406, -84.5037');
     } catch (err) {
       console.error('Failed to fetch settings');
     }
@@ -62,7 +62,7 @@ const Settings: FC = () => {
         settings: {
           google_api_key: googleApiKey,
           google_places_limit: googlePlacesLimit,
-          default_origin_city: defaultOriginCity,
+          default_map_center: defaultMapCenter,
         }
       });
       setMessage('Admin settings saved successfully');
@@ -195,8 +195,8 @@ const Settings: FC = () => {
               <input type="password" value={googleApiKey} onChange={(e) => setGoogleApiKey(e.target.value)} />
               <label>Google Places Limit</label>
               <input type="number" value={googlePlacesLimit} onChange={(e) => setGooglePlacesLimit(e.target.value)} />
-              <label>Default Origin City</label>
-              <input type="text" value={defaultOriginCity} onChange={(e) => setDefaultOriginCity(e.target.value)} />
+              <label>Default Map Center (Lat, Lng)</label>
+              <input type="text" value={defaultMapCenter} onChange={(e) => setDefaultMapCenter(e.target.value)} />
               <button type="submit" className="primary" style={{ width: '100%', marginBottom: '1rem' }}>Save Admin Settings</button>
             </form>
             <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />

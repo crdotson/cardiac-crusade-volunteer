@@ -156,7 +156,7 @@ async function initDB() {
       // Default settings
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['google_api_key', '']);
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['google_places_limit', '10']);
-      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['default_origin_city', 'Lexington, KY']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['default_map_center', '38.0406, -84.5037']);
 
       console.log('Database initialized');
       break;

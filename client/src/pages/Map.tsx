@@ -92,28 +92,23 @@ const formatCategoryName = (name: string) => {
   }
 };
 
-const MapCenterUpdater = ({ city, isGoogleLoaded }: { city: string, isGoogleLoaded: boolean }) => {
+const MapCenterUpdater = ({ centerString }: { centerString: string }) => {
   const map = useMap();
   const hasCentered = useRef(false);
   
   useEffect(() => {
-    if (hasCentered.current || !city || !isGoogleLoaded) return;
+    if (hasCentered.current || !centerString) return;
     
-    const g = (window as any).google;
-    if (g && g.maps) {
-      g.maps.importLibrary("geocoding").then(({ Geocoder }: any) => {
-        const geocoder = new Geocoder();
-        geocoder.geocode({ address: city }, (results: any, status: any) => {
-          if (status === 'OK' && results?.[0]?.geometry?.location) {
-            const lat = results[0].geometry.location.lat();
-            const lng = results[0].geometry.location.lng();
-            map.setView([lat, lng], 13);
-            hasCentered.current = true;
-          }
-        });
-      });
+    try {
+      const parts = centerString.split(',').map(s => parseFloat(s.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        map.setView([parts[0], parts[1]], 13);
+        hasCentered.current = true;
+      }
+    } catch (e) {
+      console.error("Invalid default_map_center:", centerString);
     }
-  }, [city, isGoogleLoaded, map]);
+  }, [centerString, map]);
   
   return null;
 };
@@ -209,7 +204,7 @@ const Map: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [importCity, setImportCity] = useState('Lexington, KY');
+  const [importLocation, setImportLocation] = useState('38.0406, -84.5037');
   const [isImporting, setIsImporting] = useState(false);
   
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -289,14 +284,15 @@ const Map: React.FC = () => {
           // Style the element to match our UI
           autocomplete.style.width = '100%';
           
-          if (settings?.default_origin_city) {
-            const { Geocoder } = await g.maps.importLibrary("geocoding");
-            const geocoder = new Geocoder();
-            geocoder.geocode({ address: settings.default_origin_city }, (results: any, status: any) => {
-              if (status === 'OK' && results?.[0]?.geometry?.viewport) {
-                autocomplete.locationBias = results[0].geometry.viewport;
+          if (settings?.default_map_center) {
+            try {
+              const parts = settings.default_map_center.split(',').map((s: string) => parseFloat(s.trim()));
+              if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                autocomplete.locationBias = { center: { lat: parts[0], lng: parts[1] }, radius: 50000 };
               }
-            });
+            } catch (e) {
+               console.error('Invalid default_map_center');
+            }
           }
 
           const handlePlaceSelect = async (e: any) => {
@@ -490,7 +486,7 @@ const Map: React.FC = () => {
     try {
       const res = await axios.post('api/locations/search', {
         category: selectedCategory,
-        city: importCity
+        city: importLocation
       });
       setCandidates(res.data);
       setSelectedCandidates(new Set(res.data.map((_: any, i: number) => i)));
@@ -907,7 +903,7 @@ const Map: React.FC = () => {
           {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
         </button>
         <MapContainer center={[38.0406, -84.5037]} zoom={13} style={{ height: '100%', width: '100%' }}>
-          <MapCenterUpdater city={settings?.default_origin_city || 'Lexington, KY'} isGoogleLoaded={isGoogleLoaded} />
+          <MapCenterUpdater centerString={settings?.default_map_center || '38.0406, -84.5037'} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -1120,8 +1116,8 @@ const Map: React.FC = () => {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>City/State</label>
-                  <input type="text" value={importCity} onChange={(e) => setImportCity(e.target.value)} />
+                  <label>Search Location (City or Lat/Lng)</label>
+                  <input type="text" value={importLocation} onChange={(e) => setImportLocation(e.target.value)} />
                 </div>
                 {isImporting ? (
                   <p>Searching... Please wait.</p>
