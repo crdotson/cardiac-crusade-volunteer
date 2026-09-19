@@ -113,3 +113,11 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 
 **Difficulties Encountered:**
 - **Proxy and Route Prefix Mismatches:** The backend natively mounts all routes under `/cardiac-crusade` (`process.env.BASE_PATH` fallback). When we switched the frontend to use `/` locally, API requests hit the proxy as `/api/login` instead of `/cardiac-crusade/api/login`, resulting in 404s. **Solution:** Configured Vite's `server.proxy` with a `rewrite` rule to transparently prefix `/cardiac-crusade/` onto the URL before sending it to the backend.
+
+### Session: Multi-Instance Deployment & Dynamic Map Centering
+**Changes Made:**
+1. **Dynamic Map Centering:** Added a `MapCenterUpdater` component to `Map.tsx` inside the `<MapContainer>` to fetch the `default_origin_city` from settings, geocode it using the Google Maps API, and dynamically update the map center with `map.setView()`. Previously, the initial map center was hardcoded to Lexington, KY.
+2. **Tekton & ArgoCD Multi-Instance:** Updated the `git-update-manifest` Tekton script to generate `cardiaccrusadema-prod` manifests (alongside the original `cardiaccats.org` deployment). Created a new ArgoCD Application to manage deployment of this second instance independently.
+
+**Difficulties Encountered:**
+- **Leaflet MapContainer Initialization:** `MapContainer` in React-Leaflet does not react to changes in its `center` prop after the first render. Since `settings` load asynchronously, the map rendered with a default static center before the configured city was known. **Solution:** Injected a hidden child component that uses the `useMap()` hook and triggers `map.setView()` once the settings are loaded and geocoded.
