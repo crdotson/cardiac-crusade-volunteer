@@ -121,3 +121,9 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 
 **Difficulties Encountered:**
 - **Leaflet MapContainer Initialization:** `MapContainer` in React-Leaflet does not react to changes in its `center` prop after the first render. Since `settings` load asynchronously, the map rendered with a default static center before the configured city was known. **Solution:** Injected a hidden child component that uses the `useMap()` hook and triggers `map.setView()` once the settings are loaded and geocoded.
+
+### Session: Map Center Architecture Refactor
+**Changes Made:**
+1. **Coordinate-based Map Centering:** Refactored the application to expect raw coordinate strings (e.g., `38.0406, -84.5037`) instead of string-based city names for the map's default center. This completely removes the dependency on Google's async `Geocoder` API during the initial rendering cycle, preventing race conditions where the map crashes because it attempts to invoke the Google API before it has fully loaded.
+2. **Settings Refactor:** Renamed the database settings key from `default_origin_city` to `default_map_center`. Updated the Admin Settings UI to reflect this change (`Default Map Center (Lat, Lng)`).
+3. **Autocomplete Biasing:** Updated the `locationBias` configuration for the `PlaceAutocompleteElement` to natively construct a 50km `CircleLiteral` utilizing the new coordinate format, replacing the previous viewport configuration.
