@@ -92,6 +92,32 @@ const formatCategoryName = (name: string) => {
   }
 };
 
+const MapCenterUpdater = ({ city, isGoogleLoaded }: { city: string, isGoogleLoaded: boolean }) => {
+  const map = useMap();
+  const hasCentered = useRef(false);
+  
+  useEffect(() => {
+    if (hasCentered.current || !city || !isGoogleLoaded) return;
+    
+    const g = (window as any).google;
+    if (g && g.maps) {
+      g.maps.importLibrary("geocoding").then(({ Geocoder }: any) => {
+        const geocoder = new Geocoder();
+        geocoder.geocode({ address: city }, (results: any, status: any) => {
+          if (status === 'OK' && results?.[0]?.geometry?.location) {
+            const lat = results[0].geometry.location.lat();
+            const lng = results[0].geometry.location.lng();
+            map.setView([lat, lng], 13);
+            hasCentered.current = true;
+          }
+        });
+      });
+    }
+  }, [city, isGoogleLoaded, map]);
+  
+  return null;
+};
+
 const MapEvents = ({ onDrawCreated, onImportAreaCreated, activeTool, onToolEnabled }: { 
   onDrawCreated: (bounds: L.LatLngBounds) => void, 
   onImportAreaCreated: (bounds: L.LatLngBounds) => void,
@@ -881,6 +907,7 @@ const Map: React.FC = () => {
           {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
         </button>
         <MapContainer center={[38.0406, -84.5037]} zoom={13} style={{ height: '100%', width: '100%' }}>
+          <MapCenterUpdater city={settings?.default_origin_city || 'Lexington, KY'} isGoogleLoaded={isGoogleLoaded} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
