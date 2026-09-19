@@ -92,7 +92,7 @@ const formatCategoryName = (name: string) => {
   }
 };
 
-const MapCenterUpdater = ({ centerString }: { centerString: string }) => {
+const MapCenterUpdater = ({ centerString, radiusMiles }: { centerString: string, radiusMiles?: number }) => {
   const map = useMap();
   const hasCentered = useRef(false);
   
@@ -102,13 +102,19 @@ const MapCenterUpdater = ({ centerString }: { centerString: string }) => {
     try {
       const parts = centerString.split(',').map(s => parseFloat(s.trim()));
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        map.setView([parts[0], parts[1]], 13);
+        if (radiusMiles && radiusMiles > 0) {
+          const radiusMeters = radiusMiles * 1609.34;
+          const circle = L.circle([parts[0], parts[1]], { radius: radiusMeters });
+          map.fitBounds(circle.getBounds());
+        } else {
+          map.setView([parts[0], parts[1]], 13);
+        }
         hasCentered.current = true;
       }
     } catch (e) {
       console.error("Invalid default_map_center:", centerString);
     }
-  }, [centerString, map]);
+  }, [centerString, radiusMiles, map]);
   
   return null;
 };
@@ -903,7 +909,7 @@ const Map: React.FC = () => {
           {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
         </button>
         <MapContainer center={[38.0406, -84.5037]} zoom={13} style={{ height: '100%', width: '100%' }}>
-          {settings && <MapCenterUpdater centerString={settings.default_map_center || '38.0406, -84.5037'} />}
+          {settings && <MapCenterUpdater centerString={settings.default_map_center || '38.0406, -84.5037'} radiusMiles={parseFloat(settings.default_map_radius_miles) || 5} />}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

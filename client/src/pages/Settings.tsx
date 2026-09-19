@@ -9,6 +9,7 @@ const Settings: FC = () => {
   const [googleApiKey, setGoogleApiKey] = useState('');
   const [googlePlacesLimit, setGooglePlacesLimit] = useState('10');
   const [defaultMapCenter, setDefaultMapCenter] = useState('');
+  const [defaultMapRadiusMiles, setDefaultMapRadiusMiles] = useState('5');
   const [credentials, setCredentials] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -20,6 +21,7 @@ const Settings: FC = () => {
       setGoogleApiKey(res.data.google_api_key || '');
       setGooglePlacesLimit(res.data.google_places_limit || '10');
       setDefaultMapCenter(res.data.default_map_center || '38.0406, -84.5037');
+      setDefaultMapRadiusMiles(res.data.default_map_radius_miles || '5');
     } catch (err) {
       console.error('Failed to fetch settings');
     }
@@ -63,6 +65,7 @@ const Settings: FC = () => {
           google_api_key: googleApiKey,
           google_places_limit: googlePlacesLimit,
           default_map_center: defaultMapCenter,
+          default_map_radius_miles: defaultMapRadiusMiles,
         }
       });
       setMessage('Admin settings saved successfully');
@@ -197,6 +200,8 @@ const Settings: FC = () => {
               <input type="number" value={googlePlacesLimit} onChange={(e) => setGooglePlacesLimit(e.target.value)} />
               <label>Default Map Center (Lat, Lng)</label>
               <input type="text" value={defaultMapCenter} onChange={(e) => setDefaultMapCenter(e.target.value)} />
+              <label>Default Map Radius (Miles)</label>
+              <input type="number" step="0.1" value={defaultMapRadiusMiles} onChange={(e) => setDefaultMapRadiusMiles(e.target.value)} />
               <button type="submit" className="primary" style={{ width: '100%', marginBottom: '1rem' }}>Save Admin Settings</button>
             </form>
             <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />
