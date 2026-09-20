@@ -104,8 +104,9 @@ const MapCenterUpdater = ({ centerString, radiusMiles }: { centerString: string,
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         if (radiusMiles && radiusMiles > 0) {
           const radiusMeters = radiusMiles * 1609.34;
-          const circle = L.circle([parts[0], parts[1]], { radius: radiusMeters });
-          map.fitBounds(circle.getBounds());
+          // toBounds(sizeInMeters) uses size as diameter, so multiply radius by 2
+          const bounds = L.latLng(parts[0], parts[1]).toBounds(radiusMeters * 2);
+          map.fitBounds(bounds);
         } else {
           map.setView([parts[0], parts[1]], 13);
         }
