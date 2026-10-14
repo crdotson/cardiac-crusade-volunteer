@@ -2,9 +2,7 @@
 
 | Task | Status | Notes |
 |---|---|---|
-| Explore project context | completed | Checked files, existing search APIs, CreateImportActions and Map.tsx |
-| Ask clarifying questions | completed | Search around map center/viewport, automatically use Google Places categories |
-| Propose 2-3 approaches | completed | Approach 1 selected (Dedicated Import by Name button and modal) |
-| Present design | in_progress | Presenting design sections and getting user approval |
-| Write design doc | pending | Save to docs/plans/YYYY-MM-DD-import-by-name-design.md and commit |
-| Transition to implementation | pending | Invoke writing-plans skill |
+| Task 1: Backend Route - Implement POST /api/locations/search-by-name | pending | Google Places API (New) location bias, deduplication, category formatting |
+| Task 2: Frontend List View - Add Import by Name to CreateImportActions | pending | Button, search input, candidate review list, confirm import |
+| Task 3: Frontend Map View - Add Import by Name to Map.tsx | pending | Live map.getCenter() resolution, toolbar button, modal, confirm import |
+| Task 4: Documentation & Verification | pending | Verify client build and document in GEMINI.md |
