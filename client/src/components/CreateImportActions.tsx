@@ -40,6 +40,16 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
   const [filterCategory, setFilterCategory] = useState('All');
   const [isImporting, setIsImporting] = useState(false);
 
+  // Name Import state
+  const [showNameImport, setShowNameImport] = useState(false);
+  const [nameSearchQuery, setNameSearchQuery] = useState('');
+  const [nameCandidates, setNameCandidates] = useState<any[]>([]);
+  const [selectedNameCandidates, setSelectedNameCandidates] = useState<Set<number>>(new Set());
+  const [nameFilterText, setNameFilterText] = useState('');
+  const [nameFilterCategory, setNameFilterCategory] = useState('All');
+  const [isNameSearching, setIsNameSearching] = useState(false);
+  const [isNameImporting, setIsNameImporting] = useState(false);
+
   // CSV Import state
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvImporting, setCsvImporting] = useState(false);
@@ -240,6 +250,76 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
       return matchesText && matchesCat;
     });
 
+  const handleNameSearch = async () => {
+    if (!nameSearchQuery.trim()) return;
+    setIsNameSearching(true);
+    setNameCandidates([]);
+    setSelectedNameCandidates(new Set());
+    try {
+      let center = { lat: 38.0406, lng: -84.5037 };
+      if (settings?.default_map_center) {
+        const parts = settings.default_map_center.split(',').map((s: string) => parseFloat(s.trim()));
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          center = { lat: parts[0], lng: parts[1] };
+        }
+      }
+      const res = await axios.post('api/locations/search-by-name', {
+        name: nameSearchQuery.trim(),
+        center,
+        radiusMiles: parseFloat(settings?.default_map_radius_miles) || 25
+      });
+      setNameCandidates(res.data);
+      setSelectedNameCandidates(new Set(res.data.map((_: any, i: number) => i)));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Search failed.');
+    } finally {
+      setIsNameSearching(false);
+    }
+  };
+
+  const handleConfirmNameImport = async () => {
+    const locationsToImport = nameCandidates.filter((_, i) => selectedNameCandidates.has(i));
+    if (locationsToImport.length === 0) {
+      alert('Please select at least one location.');
+      return;
+    }
+    setIsNameImporting(true);
+    try {
+      await axios.post('api/locations/confirm-import', {
+        locations: locationsToImport
+      });
+      setShowNameImport(false);
+      setNameCandidates([]);
+      setNameSearchQuery('');
+      onUpdate();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Import failed.');
+    } finally {
+      setIsNameImporting(false);
+    }
+  };
+
+  const toggleNameCandidate = (index: number) => {
+    const newSelected = new Set(selectedNameCandidates);
+    if (newSelected.has(index)) newSelected.delete(index);
+    else newSelected.add(index);
+    setSelectedNameCandidates(newSelected);
+  };
+
+  const deselectAllNameCandidates = () => {
+    setSelectedNameCandidates(new Set());
+  };
+
+  const filteredNameCandidates = nameCandidates
+    .map((c, originalIndex) => ({ ...c, originalIndex }))
+    .filter(c => {
+      const matchesText = (c.name || '').toLowerCase().includes(nameFilterText.toLowerCase()) || 
+                          (c.address || '').toLowerCase().includes(nameFilterText.toLowerCase());
+      const cat = c.category || '';
+      const matchesCat = nameFilterCategory === 'All' || cat === nameFilterCategory;
+      return matchesText && matchesCat;
+    });
+
   const handleCsvImportSubmit = () => {
     if (!csvFile) return;
     setCsvImporting(true);
@@ -349,6 +429,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
     <div style={{ marginBottom: '1rem' }}>
       <div className="button-group" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <button onClick={() => setShowImport(true)}>Import by Category</button>
+        <button onClick={() => setShowNameImport(true)}>Import by Name</button>
         <button onClick={() => navigate('/map', { state: { activeTool: 'ImportRectangle' } })}>Import by Area</button>
         {user?.role === 'Application Administrator' && (
           <button onClick={() => setShowCsvImport(true)}>Import from CSV</button>
@@ -426,6 +507,90 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={handleConfirmImport}>Confirm Import</button>
                     <button className="secondary" onClick={() => { setShowImport(false); setCandidates([]); }}>Cancel</button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showNameImport && (
+        <div className="modal-overlay">
+          <div className="modal-content card" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <button className="close-btn" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); }}>&times;</button>
+            <h3>Import by Business Name</h3>
+            {!nameCandidates.length ? (
+              <>
+                <div className="form-group">
+                  <label>Business Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Starbucks, Planet Fitness, Kroger..." 
+                    value={nameSearchQuery} 
+                    onChange={(e) => setNameSearchQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleNameSearch(); }}
+                    autoFocus
+                  />
+                </div>
+                {isNameSearching ? (
+                  <p>Searching Google Maps... Please wait.</p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button onClick={handleNameSearch} disabled={!nameSearchQuery.trim()}>Search</button>
+                    <button className="secondary" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); }}>Cancel</button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="filter-toolbar">
+                  <input 
+                    type="text" 
+                    placeholder="Filter results..." 
+                    value={nameFilterText} 
+                    onChange={e => setNameFilterText(e.target.value)} 
+                  />
+                  <select value={nameFilterCategory} onChange={e => setNameFilterCategory(e.target.value)}>
+                    <option value="All">All Categories</option>
+                    {[...new Set(nameCandidates.map(c => c.category).filter(Boolean))].map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => setSelectedNameCandidates(new Set(filteredNameCandidates.map(c => c.originalIndex)))}>Select Filtered</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
+                  <span>{selectedNameCandidates.size} of {nameCandidates.length} selected</span>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => setSelectedNameCandidates(new Set(nameCandidates.map((_, i) => i)))}>Select All</button>
+                    <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={deselectAllNameCandidates}>Deselect All</button>
+                  </div>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #eee', marginBottom: '1rem', borderRadius: '4px' }}>
+                  {filteredNameCandidates.map((c) => (
+                    <div key={c.originalIndex} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedNameCandidates.has(c.originalIndex)} 
+                        onChange={() => toggleNameCandidate(c.originalIndex)} 
+                        style={{ width: 'auto' }}
+                      />
+                      <div>
+                        <strong>{c.name}</strong><br />
+                        <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
+                        <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category)}</span>
+                        {c.phone && <><br /><span style={{ fontSize: '0.8rem', color: '#999' }}>Phone: {c.phone}</span></>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {isNameImporting ? (
+                  <p>Importing... Please wait.</p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button onClick={handleConfirmNameImport}>Confirm Import</button>
+                    <button className="secondary" onClick={() => { setNameCandidates([]); }}>New Search</button>
+                    <button className="secondary" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); }}>Cancel</button>
                   </div>
                 )}
               </>
