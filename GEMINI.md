@@ -128,5 +128,13 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 2. **Settings Refactor:** Renamed the database settings key from `default_origin_city` to `default_map_center`. Updated the Admin Settings UI to reflect this change (`Default Map Center (Lat, Lng)`).
 3. **Autocomplete Biasing:** Updated the `locationBias` configuration for the `PlaceAutocompleteElement` to natively construct a 50km `CircleLiteral` utilizing the new coordinate format, replacing the previous viewport configuration.
 
+### Session: Import by Business Name
+**Changes Made:**
+1. **Backend Route (`/api/locations/search-by-name`):** Added a new endpoint in `server/index.js` that queries the Google Places API (New) `places:searchText` endpoint using `locationBias` around coordinates provided by the client (or falling back to `default_map_center`). Results are paginated up to `google_places_limit`. Extracted categories (`places.primaryTypeDisplayName`, `places.primaryType`, or `places.types[0]`) are formatted into clean human-readable titles. Results are deduplicated against existing database locations via `stringSimilarity.compareTwoStrings` on lowercase name and address.
+2. **Frontend Map View (`Map.tsx`):** Added an "Import by Name" button to the map toolbar for administrators and coordinators. Tracks the active Leaflet map instance via `onMapReady` in `MapEvents` so searches automatically query around the live map center (`map.getCenter()`). Renders a candidate selection modal with search input, checkbox review list, category/text filter toolbar, "Select Filtered", "Deselect All", and "Confirm Import".
+3. **Frontend Locations List View (`CreateImportActions.tsx`):** Added the same "Import by Name" action and review modal to the reusable `CreateImportActions` component on the Locations List view, automatically querying around the configured `default_map_center`.
+4. **Auto-Assignment & Deduplication:** Confirmed imported locations are inserted as `Unvisited`, deduplicated, and automatically mapped into volunteer grid squares if they fall within an assigned grid.
+
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
+
