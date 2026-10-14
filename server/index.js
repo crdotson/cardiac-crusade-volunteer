@@ -964,6 +964,138 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
     }
 });
 
+mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
+    const { name, center, radiusMiles } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: 'Business name is required' });
+    }
+
+    try {
+        const keyRes = await pool.query("SELECT value FROM settings WHERE key = 'google_api_key'");
+        const apiKey = keyRes.rows[0]?.value;
+        if (!apiKey) return res.status(400).json({ message: 'Google API key not configured' });
+
+        const limitRes = await pool.query("SELECT value FROM settings WHERE key = 'google_places_limit'");
+        const rawLimit = parseInt(limitRes.rows[0]?.value);
+        const targetLimit = isNaN(rawLimit) ? 20 : Math.max(1, rawLimit);
+
+        // Determine coordinates
+        let lat = center?.lat;
+        let lng = center?.lng;
+
+        if (lat === undefined || lng === undefined || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
+            const centerRes = await pool.query("SELECT value FROM settings WHERE key = 'default_map_center'");
+            const centerVal = centerRes.rows[0]?.value;
+            if (centerVal) {
+                const parts = centerVal.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    lat = parts[0];
+                    lng = parts[1];
+                }
+            }
+        }
+
+        if (lat === undefined || lng === undefined || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
+            lat = 38.0406;
+            lng = -84.5037;
+        } else {
+            lat = parseFloat(lat);
+            lng = parseFloat(lng);
+        }
+
+        // Radius calculation
+        let miles = parseFloat(radiusMiles);
+        if (isNaN(miles) || miles <= 0) {
+            const radRes = await pool.query("SELECT value FROM settings WHERE key = 'default_map_radius_miles'");
+            const radVal = parseFloat(radRes.rows[0]?.value);
+            miles = (!isNaN(radVal) && radVal > 0) ? radVal : 25;
+        }
+        // Google Places API circle radius is capped between 500m and 50,000m
+        const radiusMeters = Math.min(50000, Math.max(500, Math.round(miles * 1609.34)));
+
+        const currentLocs = await pool.query('SELECT name, address FROM locations');
+
+        let allResults = [];
+        let pageToken = '';
+        const pageSize = 20;
+
+        while (allResults.length < targetLimit) {
+            const currentLimit = Math.min(pageSize, targetLimit - allResults.length);
+            const payload = {
+                textQuery: name.trim(),
+                pageSize: currentLimit,
+                locationBias: {
+                    circle: {
+                        center: { latitude: lat, longitude: lng },
+                        radius: radiusMeters
+                    }
+                }
+            };
+            if (pageToken) payload.pageToken = pageToken;
+
+            const response = await axios.post('https://places.googleapis.com/v1/places:searchText',
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': apiKey,
+                        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.primaryType,places.primaryTypeDisplayName,places.types,nextPageToken'
+                    }
+                }
+            );
+
+            const places = response.data.places || [];
+            allResults = allResults.concat(places);
+
+            pageToken = response.data.nextPageToken;
+            if (!pageToken || places.length === 0) break;
+        }
+
+        const formatCategory = (p) => {
+            if (p.primaryTypeDisplayName?.text) return p.primaryTypeDisplayName.text;
+            const raw = p.primaryType || (p.types && p.types[0]) || 'General';
+            return raw.replace(/_/g, ' ')
+                      .split(' ')
+                      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                      .join(' ');
+        };
+
+        const candidates = [];
+
+        for (const place of allResults) {
+            const placeName = place.displayName?.text || 'Unknown';
+            const address = place.formattedAddress || 'No Address';
+            const placeLat = place.location?.latitude;
+            const placeLng = place.location?.longitude;
+            const phone = place.internationalPhoneNumber || null;
+            const category = formatCategory(place);
+
+            let isDuplicate = false;
+            for (const existing of currentLocs.rows) {
+                const nameSim = stringSimilarity.compareTwoStrings(placeName.toLowerCase(), existing.name.toLowerCase());
+                const addrSim = stringSimilarity.compareTwoStrings(address.toLowerCase(), existing.address.toLowerCase());
+                if (nameSim > 0.8 && addrSim > 0.8) {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+
+            if (!isDuplicate) {
+                candidates.push({ name: placeName, address, lat: placeLat, lng: placeLng, phone, category });
+            }
+        }
+
+        res.json(candidates);
+    } catch (err) {
+        const errorData = err.response?.data;
+        console.error('Error in search-by-name route:', JSON.stringify(errorData || err.message));
+        if (errorData?.error?.status === 'PERMISSION_DENIED') {
+            return res.status(403).json({ message: `Google API Error: ${errorData.error.message}. Please ensure "Places API (New)" is enabled.` });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
 mainRouter.post('/api/locations/search-nearby', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
     const { bounds } = req.body;
     try {
