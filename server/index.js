@@ -1008,7 +1008,7 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
         if (isNaN(miles) || miles <= 0) {
             const radRes = await pool.query("SELECT value FROM settings WHERE key = 'default_map_radius_miles'");
             const radVal = parseFloat(radRes.rows[0]?.value);
-            miles = (!isNaN(radVal) && radVal > 0) ? radVal : 25;
+            miles = (!isNaN(radVal) && radVal > 0) ? radVal : 5;
         }
         // Google Places API circle radius is capped between 500m and 50,000m
         const radiusMeters = Math.min(50000, Math.max(500, Math.round(miles * 1609.34)));
