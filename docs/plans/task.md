@@ -2,7 +2,6 @@
 
 | Task | Status | Notes |
 |---|---|---|
-| Task 1: Backend Route - Update Radius Default & Clamping in server/index.js | completed | Aligned fallback default to 5 miles and confirmed 500m-50km clamping |
-| Task 2: Frontend List View - Add Radius Input to CreateImportActions.tsx | completed | Added nameRadiusInput state, settings sync, and form field in modal |
-| Task 3: Frontend Map View - Add Radius Input to Map.tsx | completed | Added nameRadiusInput state, settings sync, and form field in modal |
-| Task 4: Documentation & Verification | completed | Full verification (npm run build, node --check) and documented in GEMINI.md |
+| Bugfix 1: Strict locationRestriction & Haversine distance filtering in server/index.js | completed | Replaced locationBias with locationRestriction.rectangle and filtered candidates by distance <= miles |
+| Bugfix 2: Allow decimal radius inputs and show distance in candidate cards | completed | Updated step="any", min="0.1" and added distance badge in CreateImportActions.tsx & Map.tsx |
+| Bugfix 3: Build verification and documentation in GEMINI.md | completed | Verified npm run build, node --check, and documented in GEMINI.md |

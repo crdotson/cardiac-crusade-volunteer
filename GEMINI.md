@@ -137,9 +137,14 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 
 ### Session: Search Radius Parameter for Import by Name
 **Changes Made:**
-1. **Search Radius Parameter in Modal:** Added an editable "Search Radius (miles)" numeric input (constrained between 1 and 31 miles per Google Places API limits) to the "Import by Business Name" modal in both `CreateImportActions.tsx` and `Map.tsx`.
+1. **Search Radius Parameter in Modal:** Added an editable "Search Radius (miles)" numeric input supporting decimal precision (`step="any"`, `min="0.1"`, `max="31"`) to the "Import by Business Name" modal in both `CreateImportActions.tsx` and `Map.tsx`.
 2. **Default Map Radius Synchronization:** The radius input field automatically defaults to the `default_map_radius_miles` setting configured in Admin Settings (falling back to 5 miles if unconfigured).
-3. **Backend Fallback & Clamping:** Updated `POST /api/locations/search-by-name` in `server/index.js` to default its fallback radius to 5 miles and enforce safe clamping between 500 meters and 50,000 meters to prevent Google Places API `INVALID_ARGUMENT` errors.
+3. **Strict Bounding Box (`locationRestriction.rectangle`):** Replaced Google Places API `locationBias` with `locationRestriction.rectangle` derived from the search coordinates and radius to strictly constrain Google Places search results to the target area.
+4. **Server-Side Haversine Distance Filtering & Sorting:** Added precise Haversine distance calculations on the backend (`POST /api/locations/search-by-name`). Any place outside the exact circular radius is strictly filtered out, and results are returned sorted closest first with an attached `distance` property.
+5. **Distance Badge in UI:** Candidate items in the modal display an inline distance badge (`(X.X mi away)`) next to the business name for user transparency.
+
+**Difficulties Encountered:**
+- **`locationBias` vs `locationRestriction`:** In Google Places API (New) `places:searchText`, `locationBias` is merely a soft ranking preference; Google will return businesses 10-30 miles away if they match the query well. In addition, `locationRestriction` only supports `rectangle` (passing `circle` triggers an API error). **Solution:** Inscribe the search circle inside a rectangular bounding box for `locationRestriction.rectangle`, then execute exact mathematical Haversine distance filtering on the server to discard any corners or out-of-bounds results.
 
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!

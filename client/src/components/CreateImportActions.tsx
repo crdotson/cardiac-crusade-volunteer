@@ -542,9 +542,9 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                   <label>Search Radius (miles)</label>
                   <input 
                     type="number" 
-                    min="1" 
+                    min="0.1" 
                     max="31" 
-                    step="1" 
+                    step="any" 
                     placeholder="5" 
                     value={nameRadiusInput} 
                     onChange={(e) => setNameRadiusInput(e.target.value)}
@@ -595,7 +595,13 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                         style={{ width: 'auto' }}
                       />
                       <div>
-                        <strong>{c.name}</strong><br />
+                        <strong>{c.name}</strong>
+                        {c.distance !== null && c.distance !== undefined && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--primary, #007bff)', marginLeft: '0.5rem', fontWeight: 600 }}>
+                            ({c.distance} mi away)
+                          </span>
+                        )}
+                        <br />
                         <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
                         <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category)}</span>
                         {c.phone && <><br /><span style={{ fontSize: '0.8rem', color: '#999' }}>Phone: {c.phone}</span></>}

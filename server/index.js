@@ -1010,8 +1010,22 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
             const radVal = parseFloat(radRes.rows[0]?.value);
             miles = (!isNaN(radVal) && radVal > 0) ? radVal : 5;
         }
-        // Google Places API circle radius is capped between 500m and 50,000m
-        const radiusMeters = Math.min(50000, Math.max(500, Math.round(miles * 1609.34)));
+        // Cap miles up to 31 (approx 50km Google Places max limit)
+        miles = Math.min(31, miles);
+
+        // Bounding box for locationRestriction (Google Places API strictly constrains results to this rectangle)
+        const dLat = miles / 69.05;
+        const cosLat = Math.cos((lat * Math.PI) / 180);
+        const dLng = cosLat > 0.0001 ? miles / (69.05 * cosLat) : 180;
+
+        const low = {
+            latitude: Math.max(-90, lat - dLat),
+            longitude: Math.max(-180, lng - dLng)
+        };
+        const high = {
+            latitude: Math.min(90, lat + dLat),
+            longitude: Math.min(180, lng + dLng)
+        };
 
         const currentLocs = await pool.query('SELECT name, address FROM locations');
 
@@ -1024,10 +1038,10 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
             const payload = {
                 textQuery: name.trim(),
                 pageSize: currentLimit,
-                locationBias: {
-                    circle: {
-                        center: { latitude: lat, longitude: lng },
-                        radius: radiusMeters
+                locationRestriction: {
+                    rectangle: {
+                        low,
+                        high
                     }
                 }
             };
@@ -1051,6 +1065,18 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
             if (!pageToken || places.length === 0) break;
         }
 
+        const haversineDistanceMiles = (lat1, lon1, lat2, lon2) => {
+            const toRad = x => (x * Math.PI) / 180;
+            const R = 3958.8; // Earth radius in miles
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        };
+
         const formatCategory = (p) => {
             if (p.primaryTypeDisplayName?.text) return p.primaryTypeDisplayName.text;
             const raw = p.primaryType || (p.types && p.types[0]) || 'General';
@@ -1070,6 +1096,15 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
             const phone = place.internationalPhoneNumber || null;
             const category = formatCategory(place);
 
+            // Calculate precise circular distance and filter out any place outside the radius
+            let distMiles = null;
+            if (placeLat !== undefined && placeLng !== undefined) {
+                distMiles = haversineDistanceMiles(lat, lng, placeLat, placeLng);
+                if (distMiles > miles) {
+                    continue; // Skip results outside the circular search radius
+                }
+            }
+
             let isDuplicate = false;
             for (const existing of currentLocs.rows) {
                 const nameSim = stringSimilarity.compareTwoStrings(placeName.toLowerCase(), existing.name.toLowerCase());
@@ -1081,9 +1116,20 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
             }
 
             if (!isDuplicate) {
-                candidates.push({ name: placeName, address, lat: placeLat, lng: placeLng, phone, category });
+                candidates.push({ 
+                    name: placeName, 
+                    address, 
+                    lat: placeLat, 
+                    lng: placeLng, 
+                    phone, 
+                    category,
+                    distance: distMiles !== null ? Math.round(distMiles * 10) / 10 : null
+                });
             }
         }
+
+        // Sort candidates by distance closest first
+        candidates.sort((a, b) => ((a.distance !== null ? a.distance : 999) - (b.distance !== null ? b.distance : 999)));
 
         res.json(candidates);
     } catch (err) {
