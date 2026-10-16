@@ -135,6 +135,13 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 3. **Frontend Locations List View (`CreateImportActions.tsx`):** Added the same "Import by Name" action and review modal to the reusable `CreateImportActions` component on the Locations List view, automatically querying around the configured `default_map_center`.
 4. **Auto-Assignment & Deduplication:** Confirmed imported locations are inserted as `Unvisited`, deduplicated, and automatically mapped into volunteer grid squares if they fall within an assigned grid.
 
+### Session: Search Radius Parameter for Import by Name
+**Changes Made:**
+1. **Search Radius Parameter in Modal:** Added an editable "Search Radius (miles)" numeric input (constrained between 1 and 31 miles per Google Places API limits) to the "Import by Business Name" modal in both `CreateImportActions.tsx` and `Map.tsx`.
+2. **Default Map Radius Synchronization:** The radius input field automatically defaults to the `default_map_radius_miles` setting configured in Admin Settings (falling back to 5 miles if unconfigured).
+3. **Backend Fallback & Clamping:** Updated `POST /api/locations/search-by-name` in `server/index.js` to default its fallback radius to 5 miles and enforce safe clamping between 500 meters and 50,000 meters to prevent Google Places API `INVALID_ARGUMENT` errors.
+
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
+
 
