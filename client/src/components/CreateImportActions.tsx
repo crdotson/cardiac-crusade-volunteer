@@ -43,6 +43,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
   // Name Import state
   const [showNameImport, setShowNameImport] = useState(false);
   const [nameSearchQuery, setNameSearchQuery] = useState('');
+  const [nameRadiusInput, setNameRadiusInput] = useState<string>('5');
   const [nameCandidates, setNameCandidates] = useState<any[]>([]);
   const [selectedNameCandidates, setSelectedNameCandidates] = useState<Set<number>>(new Set());
   const [nameFilterText, setNameFilterText] = useState('');
@@ -78,6 +79,9 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
           setSettings(settsRes.data);
           if (settsRes.data.default_map_center) {
             setImportLocation(settsRes.data.default_map_center);
+          }
+          if (settsRes.data.default_map_radius_miles) {
+            setNameRadiusInput(settsRes.data.default_map_radius_miles);
           }
         }
       } catch (err) {
@@ -263,10 +267,11 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
           center = { lat: parts[0], lng: parts[1] };
         }
       }
+      const radiusToUse = parseFloat(nameRadiusInput) || parseFloat(settings?.default_map_radius_miles) || 5;
       const res = await axios.post('api/locations/search-by-name', {
         name: nameSearchQuery.trim(),
         center,
-        radiusMiles: parseFloat(settings?.default_map_radius_miles) || 25
+        radiusMiles: radiusToUse
       });
       setNameCandidates(res.data);
       setSelectedNameCandidates(new Set(res.data.map((_: any, i: number) => i)));
@@ -523,7 +528,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
             {!nameCandidates.length ? (
               <>
                 <div className="form-group">
-                  <label>Business Name</label>
+                  <label>Business Name *</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Starbucks, Planet Fitness, Kroger..." 
@@ -532,6 +537,20 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                     onKeyDown={(e) => { if (e.key === 'Enter') handleNameSearch(); }}
                     autoFocus
                   />
+                </div>
+                <div className="form-group">
+                  <label>Search Radius (miles)</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="31" 
+                    step="1" 
+                    placeholder="5" 
+                    value={nameRadiusInput} 
+                    onChange={(e) => setNameRadiusInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleNameSearch(); }}
+                  />
+                  <small style={{ color: '#666', fontSize: '0.8rem' }}>Max 31 miles (Google Places API limit)</small>
                 </div>
                 {isNameSearching ? (
                   <p>Searching Google Maps... Please wait.</p>
