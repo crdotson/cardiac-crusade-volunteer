@@ -1029,42 +1029,6 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
 
         const currentLocs = await pool.query('SELECT name, address FROM locations');
 
-        let allResults = [];
-        let pageToken = '';
-        const pageSize = 20;
-
-        while (allResults.length < targetLimit) {
-            const currentLimit = Math.min(pageSize, targetLimit - allResults.length);
-            const payload = {
-                textQuery: name.trim(),
-                pageSize: currentLimit,
-                locationRestriction: {
-                    rectangle: {
-                        low,
-                        high
-                    }
-                }
-            };
-            if (pageToken) payload.pageToken = pageToken;
-
-            const response = await axios.post('https://places.googleapis.com/v1/places:searchText',
-                payload,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Goog-Api-Key': apiKey,
-                        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.primaryType,places.primaryTypeDisplayName,places.types,nextPageToken'
-                    }
-                }
-            );
-
-            const places = response.data.places || [];
-            allResults = allResults.concat(places);
-
-            pageToken = response.data.nextPageToken;
-            if (!pageToken || places.length === 0) break;
-        }
-
         const haversineDistanceMiles = (lat1, lon1, lat2, lon2) => {
             const toRad = x => (x * Math.PI) / 180;
             const R = 3958.8; // Earth radius in miles
@@ -1086,46 +1050,118 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
                       .join(' ');
         };
 
+        const normalizeText = (s) => (s || '')
+            .toLowerCase()
+            .replace(/['’]/g, '')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const matchesSearchQuery = (placeName, query) => {
+            if (!placeName || !query) return false;
+            const pLower = placeName.toLowerCase();
+            const qLower = query.toLowerCase().trim();
+            if (pLower.includes(qLower)) return true;
+            const pNorm = normalizeText(placeName);
+            const qNorm = normalizeText(query);
+            if (qNorm && pNorm.includes(qNorm)) return true;
+            return false;
+        };
+
         const candidates = [];
+        let pageToken = '';
+        let pageCount = 0;
+        const maxPages = 3; // Google Places searchText allows up to 60 results (3 pages of 20)
 
-        for (const place of allResults) {
-            const placeName = place.displayName?.text || 'Unknown';
-            const address = place.formattedAddress || 'No Address';
-            const placeLat = place.location?.latitude;
-            const placeLng = place.location?.longitude;
-            const phone = place.internationalPhoneNumber || null;
-            const category = formatCategory(place);
+        while (candidates.length < targetLimit && pageCount < maxPages) {
+            pageCount++;
+            const payload = {
+                textQuery: name.trim(),
+                pageSize: 20,
+                locationRestriction: {
+                    rectangle: {
+                        low,
+                        high
+                    }
+                }
+            };
+            if (pageToken) payload.pageToken = pageToken;
 
-            // Calculate precise circular distance and filter out any place outside the radius
-            let distMiles = null;
-            if (placeLat !== undefined && placeLng !== undefined) {
-                distMiles = haversineDistanceMiles(lat, lng, placeLat, placeLng);
-                if (distMiles > miles) {
-                    continue; // Skip results outside the circular search radius
+            const response = await axios.post('https://places.googleapis.com/v1/places:searchText',
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': apiKey,
+                        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.primaryType,places.primaryTypeDisplayName,places.types,nextPageToken'
+                    }
+                }
+            );
+
+            const places = response.data.places || [];
+            if (places.length === 0) break;
+
+            for (const place of places) {
+                const placeName = place.displayName?.text || 'Unknown';
+
+                // Enforce that the business name contains the search term as a substring
+                if (!matchesSearchQuery(placeName, name)) {
+                    continue;
+                }
+
+                const address = place.formattedAddress || 'No Address';
+                const placeLat = place.location?.latitude;
+                const placeLng = place.location?.longitude;
+                const phone = place.internationalPhoneNumber || null;
+                const category = formatCategory(place);
+
+                // Calculate precise circular distance and filter out any place outside the radius
+                let distMiles = null;
+                if (placeLat !== undefined && placeLng !== undefined) {
+                    distMiles = haversineDistanceMiles(lat, lng, placeLat, placeLng);
+                    if (distMiles > miles) {
+                        continue; // Skip results outside the circular search radius
+                    }
+                }
+
+                // Check for duplicates in current database locations
+                let isDuplicate = false;
+                for (const existing of currentLocs.rows) {
+                    const nameSim = stringSimilarity.compareTwoStrings(placeName.toLowerCase(), existing.name.toLowerCase());
+                    const addrSim = stringSimilarity.compareTwoStrings(address.toLowerCase(), existing.address.toLowerCase());
+                    if (nameSim > 0.8 && addrSim > 0.8) {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+
+                // Check for duplicate candidates across pages
+                const alreadyCandidate = candidates.some(c => 
+                    stringSimilarity.compareTwoStrings(c.name.toLowerCase(), placeName.toLowerCase()) > 0.8 &&
+                    stringSimilarity.compareTwoStrings(c.address.toLowerCase(), address.toLowerCase()) > 0.8
+                );
+                if (alreadyCandidate) {
+                    continue;
+                }
+
+                if (!isDuplicate) {
+                    candidates.push({ 
+                        name: placeName, 
+                        address, 
+                        lat: placeLat, 
+                        lng: placeLng, 
+                        phone, 
+                        category,
+                        distance: distMiles !== null ? Math.round(distMiles * 10) / 10 : null
+                    });
+                    if (candidates.length >= targetLimit) {
+                        break;
+                    }
                 }
             }
 
-            let isDuplicate = false;
-            for (const existing of currentLocs.rows) {
-                const nameSim = stringSimilarity.compareTwoStrings(placeName.toLowerCase(), existing.name.toLowerCase());
-                const addrSim = stringSimilarity.compareTwoStrings(address.toLowerCase(), existing.address.toLowerCase());
-                if (nameSim > 0.8 && addrSim > 0.8) {
-                    isDuplicate = true;
-                    break;
-                }
-            }
-
-            if (!isDuplicate) {
-                candidates.push({ 
-                    name: placeName, 
-                    address, 
-                    lat: placeLat, 
-                    lng: placeLng, 
-                    phone, 
-                    category,
-                    distance: distMiles !== null ? Math.round(distMiles * 10) / 10 : null
-                });
-            }
+            pageToken = response.data.nextPageToken;
+            if (!pageToken) break;
         }
 
         // Sort candidates by distance closest first

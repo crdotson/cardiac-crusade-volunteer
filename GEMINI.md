@@ -155,6 +155,14 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 **Difficulties Encountered:**
 - **CSS Flexbox `flex: 1` Negative Free Space Trap:** In a column flex container whose height is constrained only by `max-height`, any flex item styled with `flex: 1` has `flex-basis: 0%` and `min-height: 0` (via `overflow: auto`). When a query returned few items (content < `max-height`), the container did not constrain and items remained visible. But as soon as content exceeded `max-height` (such as 19 results totaling ~1700px), the browser applied all negative free space to the only shrinkable item (`flex-shrink: 1`), shrinking the list container to 0px. **Solution:** Always enforce an explicit `minHeight` (e.g., `180px`) and `maxHeight` (`50vh`) with `flex: '1 1 auto'` so scrollable list children are strictly bounded and cannot collapse.
 
+### Session: Substring Matching & Multi-Page Collection for Import by Name
+**Changes Made:**
+1. **Strict Name Substring Matching**: Implemented `matchesSearchQuery` in `server/index.js` to strictly enforce that returned Google Places candidates have the user's search query as a case-insensitive substring in their business name. Includes normalization for apostrophes, punctuation, and extra whitespace so queries like "whole" match "Whole Foods Market" or "Whole Therapy", while "whole foods" matches "Whole Foods Market" or "The Whole Foods" but excludes unrelated supermarkets like "Trader Joe's" or "Kroger" that Google returned merely through semantic association.
+2. **Multi-Page Candidate Collection**: Refactored the pagination loop in `/api/locations/search-by-name` to continue requesting subsequent Google Places pages (up to 3 pages / 60 places max) until `candidates.length >= targetLimit` or no more pages exist. Previously, the loop exited as soon as 20 raw Google places were fetched on page 1, which caused businesses ranked on subsequent pages (such as "Whole Foods" when searching for "whole") to never be retrieved.
+
+**Difficulties Encountered:**
+- **Google Places Semantic Keyword Overreach:** Google's `places:searchText` endpoint returns businesses based on broad keyword and category associations (e.g. searching "whole foods" returns any grocery store). In addition, semantic matches on page 1 frequently displace actual exact-name matches to page 2 or 3. **Solution:** Always fetch Google pages in full 20-place chunks and continue paginating through `nextPageToken` until `targetLimit` *matching* candidate places are accumulated, filtering out non-substring semantic results at each page step.
+
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
 
