@@ -11,12 +11,18 @@ interface CreateImportActionsProps {
 const statuses = ['Unvisited', 'Left Literature', 'Engaged/No Answer', 'Interested', 'Already Has AED', 'Refused/Not Interested'];
 
 const formatCategoryName = (name: string) => {
-  if (!name) return 'N/A';
-  return name.replace(/_/g, ' ')
-             .split(' ')
-             .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-             .join(' ');
+  if (!name || typeof name !== 'string') return 'N/A';
+  try {
+    return name.replace(/_/g, ' ')
+               .split(' ')
+               .filter(Boolean)
+               .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+               .join(' ');
+  } catch (e) {
+    return name || 'N/A';
+  }
 };
+
 
 const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) => {
   const { user } = useAuth();
@@ -198,6 +204,8 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
     setIsImporting(true);
     setCandidates([]);
     setSelectedCandidates(new Set());
+    setFilterText('');
+    setFilterCategory('All');
     try {
       const res = await axios.post('api/locations/search', {
         category: selectedCategory,
@@ -259,6 +267,8 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
     setIsNameSearching(true);
     setNameCandidates([]);
     setSelectedNameCandidates(new Set());
+    setNameFilterText('');
+    setNameFilterCategory('All');
     try {
       let center = { lat: 38.0406, lng: -84.5037 };
       if (settings?.default_map_center) {
@@ -444,8 +454,8 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
 
       {showImport && (
         <div className="modal-overlay">
-          <div className="modal-content card" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-            <button className="close-btn" onClick={() => { setShowImport(false); setCandidates([]); }}>&times;</button>
+          <div className="modal-content card" style={{ maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
+            <button className="close-btn" onClick={() => { setShowImport(false); setCandidates([]); setFilterText(''); setFilterCategory('All'); }}>&times;</button>
             <h3>Import from Google Places</h3>
             {!candidates.length ? (
               <>
@@ -464,7 +474,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={handleSearch}>Search</button>
-                    <button className="secondary" onClick={() => setShowImport(false)}>Cancel</button>
+                    <button className="secondary" onClick={() => { setShowImport(false); setCandidates([]); setFilterText(''); setFilterCategory('All'); }}>Cancel</button>
                   </div>
                 )}
               </>
@@ -489,29 +499,35 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                   <span>{selectedCandidates.size} of {candidates.length} selected</span>
                   <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={deselectAll}>Deselect All</button>
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #eee', marginBottom: '1rem', borderRadius: '4px' }}>
-                  {filteredCandidates.map((c) => (
-                    <div key={c.originalIndex} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedCandidates.has(c.originalIndex)} 
-                        onChange={() => toggleCandidate(c.originalIndex)} 
-                        style={{ width: 'auto' }}
-                      />
-                      <div>
-                        <strong>{c.name}</strong><br />
-                        <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
-                        <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category || (c.categories && c.categories[0]))}</span>
-                      </div>
+                <div style={{ flex: '1 1 auto', minHeight: '180px', maxHeight: '50vh', overflowY: 'auto', border: '1px solid #eee', marginBottom: '1rem', borderRadius: '4px' }}>
+                  {filteredCandidates.length === 0 ? (
+                    <div style={{ padding: '1.5rem', textAlign: 'center', color: '#666' }}>
+                      {candidates.length === 0 ? 'No results found.' : 'No results match the current filter.'}
                     </div>
-                  ))}
+                  ) : (
+                    filteredCandidates.map((c) => (
+                      <div key={c.originalIndex} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedCandidates.has(c.originalIndex)} 
+                          onChange={() => toggleCandidate(c.originalIndex)} 
+                          style={{ width: 'auto' }}
+                        />
+                        <div>
+                          <strong>{c.name}</strong><br />
+                          <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
+                          <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category || (c.categories && c.categories[0]))}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
                 {isImporting ? (
                   <p>Importing... Please wait.</p>
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={handleConfirmImport}>Confirm Import</button>
-                    <button className="secondary" onClick={() => { setShowImport(false); setCandidates([]); }}>Cancel</button>
+                    <button className="secondary" onClick={() => { setShowImport(false); setCandidates([]); setFilterText(''); setFilterCategory('All'); }}>Cancel</button>
                   </div>
                 )}
               </>
@@ -522,8 +538,8 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
 
       {showNameImport && (
         <div className="modal-overlay">
-          <div className="modal-content card" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-            <button className="close-btn" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); }}>&times;</button>
+          <div className="modal-content card" style={{ maxWidth: '600px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
+            <button className="close-btn" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); setNameFilterText(''); setNameFilterCategory('All'); }}>&times;</button>
             <h3>Import by Business Name</h3>
             {!nameCandidates.length ? (
               <>
@@ -557,7 +573,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={handleNameSearch} disabled={!nameSearchQuery.trim()}>Search</button>
-                    <button className="secondary" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); }}>Cancel</button>
+                    <button className="secondary" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); setNameFilterText(''); setNameFilterCategory('All'); }}>Cancel</button>
                   </div>
                 )}
               </>
@@ -585,37 +601,43 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                     <button className="secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={deselectAllNameCandidates}>Deselect All</button>
                   </div>
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #eee', marginBottom: '1rem', borderRadius: '4px' }}>
-                  {filteredNameCandidates.map((c) => (
-                    <div key={c.originalIndex} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedNameCandidates.has(c.originalIndex)} 
-                        onChange={() => toggleNameCandidate(c.originalIndex)} 
-                        style={{ width: 'auto' }}
-                      />
-                      <div>
-                        <strong>{c.name}</strong>
-                        {c.distance !== null && c.distance !== undefined && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--primary, #007bff)', marginLeft: '0.5rem', fontWeight: 600 }}>
-                            ({c.distance} mi away)
-                          </span>
-                        )}
-                        <br />
-                        <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
-                        <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category)}</span>
-                        {c.phone && <><br /><span style={{ fontSize: '0.8rem', color: '#999' }}>Phone: {c.phone}</span></>}
-                      </div>
+                <div style={{ flex: '1 1 auto', minHeight: '180px', maxHeight: '50vh', overflowY: 'auto', border: '1px solid #eee', marginBottom: '1rem', borderRadius: '4px' }}>
+                  {filteredNameCandidates.length === 0 ? (
+                    <div style={{ padding: '1.5rem', textAlign: 'center', color: '#666' }}>
+                      {nameCandidates.length === 0 ? 'No results found.' : 'No results match the current filter.'}
                     </div>
-                  ))}
+                  ) : (
+                    filteredNameCandidates.map((c) => (
+                      <div key={c.originalIndex} style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedNameCandidates.has(c.originalIndex)} 
+                          onChange={() => toggleNameCandidate(c.originalIndex)} 
+                          style={{ width: 'auto' }}
+                        />
+                        <div>
+                          <strong>{c.name}</strong>
+                          {c.distance !== null && c.distance !== undefined && (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--primary, #007bff)', marginLeft: '0.5rem', fontWeight: 600 }}>
+                              ({c.distance} mi away)
+                            </span>
+                          )}
+                          <br />
+                          <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
+                          <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category)}</span>
+                          {c.phone && <><br /><span style={{ fontSize: '0.8rem', color: '#999' }}>Phone: {c.phone}</span></>}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
                 {isNameImporting ? (
                   <p>Importing... Please wait.</p>
                 ) : (
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <button onClick={handleConfirmNameImport}>Confirm Import</button>
-                    <button className="secondary" onClick={() => { setNameCandidates([]); }}>New Search</button>
-                    <button className="secondary" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); }}>Cancel</button>
+                    <button className="secondary" onClick={() => { setNameCandidates([]); setNameFilterText(''); setNameFilterCategory('All'); }}>New Search</button>
+                    <button className="secondary" onClick={() => { setShowNameImport(false); setNameCandidates([]); setNameSearchQuery(''); setNameFilterText(''); setNameFilterCategory('All'); }}>Cancel</button>
                   </div>
                 )}
               </>

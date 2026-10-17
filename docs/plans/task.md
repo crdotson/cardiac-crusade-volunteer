@@ -2,6 +2,6 @@
 
 | Task | Status | Notes |
 |---|---|---|
-| Bugfix 1: Strict locationRestriction & Haversine distance filtering in server/index.js | completed | Replaced locationBias with locationRestriction.rectangle and filtered candidates by distance <= miles |
-| Bugfix 2: Allow decimal radius inputs and show distance in candidate cards | completed | Updated step="any", min="0.1" and added distance badge in CreateImportActions.tsx & Map.tsx |
-| Bugfix 3: Build verification and documentation in GEMINI.md | completed | Verified npm run build, node --check, and documented in GEMINI.md |
+| Fix candidate results list container height & prevent flex collapse in CreateImportActions.tsx and Map.tsx | completed | Replaced flex: 1 with flex: '1 1 auto', minHeight: '180px', maxHeight: '50vh', overflowY: 'auto' |
+| Reset filter state on search/cancel and add empty-filter indicator in modal | completed | Cleared filter text and category on new search/cancel and added empty state messaging |
+| Build verification & project log update | completed | Ran npm run build (passed in 1.90s), verified server syntax, and updated GEMINI.md |
