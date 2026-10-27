@@ -16,6 +16,7 @@ import {
 } from '@simplewebauthn/server';
 import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import 'dotenv/config';
+import { validateSignupPayload, determineRollUpId } from './signup-helpers.js';
 
 const __dirname = import.meta.dirname;
 
@@ -207,6 +208,40 @@ const authorizeRoles = (...roles) => {
 const currentChallenges = new Map();
 
 // --- Auth Endpoints ---
+
+mainRouter.post('/api/signup', async (req, res) => {
+    try {
+        const { email, password, name } = req.body;
+        const validated = validateSignupPayload({ email, password });
+
+        const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [validated.email]);
+        if (existing.rows.length > 0) {
+            return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+        }
+
+        const coords = await pool.query("SELECT id FROM users WHERE role = 'City Coordinator' ORDER BY id ASC LIMIT 1");
+        const admins = await pool.query("SELECT id FROM users WHERE role = 'Application Administrator' ORDER BY id ASC LIMIT 1");
+        const rollUpToId = determineRollUpId(coords.rows, admins.rows);
+
+        let passwordHash = null;
+        if (validated.hasPassword) {
+            passwordHash = await bcrypt.hash(password, 10);
+        }
+
+        const insertRes = await pool.query(
+            'INSERT INTO users (email, name, password_hash, role, roll_up_to_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role',
+            [validated.email, name ? name.trim() : null, passwordHash, 'Volunteer', rollUpToId]
+        );
+        const newUser = insertRes.rows[0];
+
+        const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role }, JWT_SECRET, { expiresIn: '24h' });
+        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+        res.json({ success: true, user: newUser });
+    } catch (err) {
+        console.error('Error in /api/signup:', err);
+        res.status(400).json({ success: false, message: err.message || 'Signup failed' });
+    }
+});
 
 mainRouter.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
