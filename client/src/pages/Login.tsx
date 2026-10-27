@@ -88,6 +88,11 @@ const Login: FC = () => {
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
           <Link to="/forgot-password" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>Forgot Password?</Link>
         </div>
+
+        <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--light-gray)' }}>
+          <span style={{ color: 'var(--gray)', fontSize: '0.9rem' }}>Don't have an account? </span>
+          <Link to="/signup" style={{ color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem' }}>Sign Up</Link>
+        </div>
       </div>
     </div>
   );
