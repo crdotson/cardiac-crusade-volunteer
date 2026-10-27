@@ -372,3 +372,91 @@ gm-place-autocomplete::part(dropdown),
 .gm-popover-container {
   z-index: 10000 !important;
 }
+
+/* --- Rich Text Editor Styles --- */
+.rich-editor-container {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.rich-editor-toolbar .toolbar-btn {
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #333333;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0;
+  transition: all 0.15s ease-in-out;
+}
+
+.rich-editor-toolbar .toolbar-btn:hover {
+  background: #e2e6ea;
+  border-color: #dae0e5;
+  color: #111111;
+  opacity: 1;
+}
+
+.rich-editor-toolbar .toolbar-btn.primary-tint {
+  background: #fdf2f2;
+  color: var(--primary-color);
+  border: 1px solid #f8d7da;
+}
+
+.rich-editor-toolbar .toolbar-btn.primary-tint:hover {
+  background: var(--primary-color);
+  color: #ffffff;
+}
+
+.rich-editor-toolbar .toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--light-gray);
+  margin: 0 4px;
+}
+
+.rich-editor-content:focus {
+  outline: none;
+}
+
+.rich-editor-content img {
+  cursor: pointer;
+  transition: outline 0.15s ease-in-out;
+}
+
+.rich-editor-content img:hover {
+  outline: 2px solid var(--primary-color);
+}
+
+.login-rich-content-display {
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.login-rich-content-display img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.login-rich-content-display a {
+  color: var(--primary-color);
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.login-rich-content-display h1,
+.login-rich-content-display h2,
+.login-rich-content-display h3 {
+  color: var(--primary-color);
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.login-rich-content-display p {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
