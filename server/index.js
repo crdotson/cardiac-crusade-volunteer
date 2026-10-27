@@ -63,16 +63,24 @@ async function initDB() {
           role VARCHAR(50) NOT NULL,
           roll_up_to_id INTEGER REFERENCES users(id),
           fido2_credentials JSONB DEFAULT '[]',
-          social_ids JSONB DEFAULT '{}'
+          social_ids JSONB DEFAULT '{}',
+          last_login TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
 
-      // Ensure 'name' column exists if table was already created
+      // Ensure 'name', 'last_login', and 'created_at' columns exist if table was already created
       await pool.query(`
         DO \$\$ 
         BEGIN 
           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='name') THEN
             ALTER TABLE users ADD COLUMN name VARCHAR(255);
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_login') THEN
+            ALTER TABLE users ADD COLUMN last_login TIMESTAMP WITH TIME ZONE;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='created_at') THEN
+            ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
           END IF;
         END \$\$;
       `);
@@ -254,6 +262,7 @@ mainRouter.post('/api/login', async (req, res) => {
             }
             const match = await bcrypt.compare(password, user.password_hash);
             if (match) {
+                await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
                 const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
                 res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
                 res.json({ success: true, user: { id: user.id, email: user.email, role: user.role } });
@@ -424,11 +433,11 @@ mainRouter.post('/api/auth/fido2/login-verify', async (req, res) => {
         });
 
         if (verification.verified) {
-            // Update counter
+            // Update counter and last_login
             const updatedCredentials = user.fido2_credentials.map(c => 
                 c.credentialID === body.id ? { ...c, counter: verification.authenticationInfo.newCounter } : c
             );
-            await pool.query('UPDATE users SET fido2_credentials = $1 WHERE id = $2', [JSON.stringify(updatedCredentials), user.id]);
+            await pool.query('UPDATE users SET fido2_credentials = $1, last_login = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedCredentials), user.id]);
 
             const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
             res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
@@ -589,14 +598,14 @@ mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Admi
 
         if (role === 'Application Administrator') {
             query = `
-                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
+                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email, u.last_login, u.created_at 
                 FROM users u 
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
             `;
         } else if (role === 'City Coordinator') {
             // City Coordinators see users they created OR users created by Volunteer leaders they supervise
             query = `
-                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
+                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email, u.last_login, u.created_at 
                 FROM users u 
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
                 WHERE u.roll_up_to_id = $1 
@@ -605,7 +614,7 @@ mainRouter.get('/api/users', authenticateToken, authorizeRoles('Application Admi
             params = [id];
         } else if (role === 'Volunteer leader') {
             query = `
-                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email 
+                SELECT u.id, u.email, u.name, u.role, u.roll_up_to_id, r.email as roll_up_to_email, u.last_login, u.created_at 
                 FROM users u 
                 LEFT JOIN users r ON u.roll_up_to_id = r.id
                 WHERE u.roll_up_to_id = $1

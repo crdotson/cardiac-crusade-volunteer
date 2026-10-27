@@ -10,6 +10,8 @@ interface User {
   role: string;
   roll_up_to_id: number | null;
   roll_up_to_email: string | null;
+  last_login?: string | null;
+  created_at?: string | null;
 }
 
 const Users: React.FC = () => {
@@ -32,6 +34,20 @@ const Users: React.FC = () => {
     } catch (err: any) {
       setError('Failed to fetch users');
     }
+  };
+
+  const formatDateTime = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return 'Never';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Never';
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   useEffect(() => {
@@ -246,32 +262,46 @@ const Users: React.FC = () => {
 
       <div className="card">
         <h2 style={{ color: 'var(--primary-color)' }}>User Hierarchy</h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--light-gray)' }}>
-              <th style={{ padding: '1rem' }}>Email</th>
-              <th style={{ padding: '1rem' }}>Name</th>
-              <th style={{ padding: '1rem' }}>Role</th>
-              <th style={{ padding: '1rem' }}>Rolls Up To</th>
-              <th style={{ padding: '1rem' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.id} style={{ borderBottom: '1px solid var(--light-gray)' }}>
-                <td style={{ padding: '1rem' }}>{u.email}</td>
-                <td style={{ padding: '1rem' }}>{u.name || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>N/A</span>}</td>
-                <td style={{ padding: '1rem' }}>{u.role}</td>
-                <td style={{ padding: '1rem' }}>
-                  {u.roll_up_to_email || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>N/A</span>}
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  <button className="button secondary small" onClick={() => setEditingUser(u)}>Edit</button>
-                </td>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--light-gray)' }}>
+                <th style={{ padding: '1rem' }}>Email</th>
+                <th style={{ padding: '1rem' }}>Name</th>
+                <th style={{ padding: '1rem' }}>Role</th>
+                <th style={{ padding: '1rem' }}>Rolls Up To</th>
+                <th style={{ padding: '1rem' }}>Created</th>
+                <th style={{ padding: '1rem' }}>Last Login</th>
+                <th style={{ padding: '1rem' }}>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} style={{ borderBottom: '1px solid var(--light-gray)' }}>
+                  <td style={{ padding: '1rem' }}>{u.email}</td>
+                  <td style={{ padding: '1rem' }}>{u.name || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>N/A</span>}</td>
+                  <td style={{ padding: '1rem' }}>{u.role}</td>
+                  <td style={{ padding: '1rem' }}>
+                    {u.roll_up_to_email || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>N/A</span>}
+                  </td>
+                  <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
+                    {formatDateTime(u.created_at)}
+                  </td>
+                  <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
+                    {u.last_login ? (
+                      formatDateTime(u.last_login)
+                    ) : (
+                      <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>Never</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <button className="button secondary small" onClick={() => setEditingUser(u)}>Edit</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showPreview && (

@@ -175,6 +175,13 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 5. **Entry Point on Login Screen (`Login.tsx`)**: Added a clear *"Don't have an account? Sign Up"* link beneath the login card leading to `/signup`.
 6. **Unit Tests**: Created `server/test/signup-helper.test.js` covering `determineRollUpId` coordinator fallbacks and `validateSignupPayload` edge cases (normalizing emails, short passwords, passkey-only signup).
 
+### Session: User Sign-in & Creation Tracking
+**Changes Made:**
+1. **Database Schema Migration**: Added idempotent migration logic in `server/index.js` `initDB()` to add `last_login TIMESTAMP WITH TIME ZONE` (nullable) and `created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP` to the `users` table.
+2. **Authentication Updates**: Updated both password login (`POST /api/login`) and FIDO2 WebAuthn login verification (`POST /api/auth/fido2/login-verify`) to update `last_login = CURRENT_TIMESTAMP` on successful login.
+3. **User Management API**: Updated `GET /api/users` across all three supervisor roles (Application Administrator, City Coordinator, Volunteer leader) to select `u.last_login` and `u.created_at`.
+4. **User Management UI (`Users.tsx`)**: Updated `interface User` to include `last_login` and `created_at`. Added a `formatDateTime` helper to render human-readable timestamps (e.g., `Oct 26, 2026, 10:14 PM`) and `Never` if `last_login` is null. Added **Created** and **Last Login** column headers and values to the User Hierarchy table, wrapped in a responsive horizontally-scrollable container.
+
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
 
