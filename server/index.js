@@ -17,6 +17,7 @@ import {
 import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import 'dotenv/config';
 import { validateSignupPayload, determineRollUpId } from './signup-helpers.js';
+import { validateImageUpload } from './media-helpers.js';
 
 const __dirname = import.meta.dirname;
 
@@ -26,7 +27,8 @@ app.use(cors({
     origin: ['https://www.dotson97.org', 'https://test-cardiaccrusade.dotson97.org', 'http://localhost:1443'],
     credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 const BASE_PATH = process.env.BASE_PATH || '/cardiac-crusade';
@@ -151,6 +153,16 @@ async function initDB() {
       await pool.query(`
         DROP TABLE IF EXISTS assignments;
       `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS uploaded_images (
+          id SERIAL PRIMARY KEY,
+          filename VARCHAR(255) NOT NULL,
+          mime_type VARCHAR(100) NOT NULL,
+          data BYTEA NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
       
       const adminEmail = 'chris@dotson97.org';
       const adminPassword = 'changeme';
@@ -167,6 +179,7 @@ async function initDB() {
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['google_places_limit', '10']);
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['default_map_center', '38.0406, -84.5037']);
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['default_map_radius_miles', '5']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['login_page_content', '']);
 
       console.log('Database initialized');
       break;
@@ -740,6 +753,65 @@ mainRouter.post('/api/settings', authenticateToken, authorizeRoles('Application 
             await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, value]);
         }
         res.json({ success: true });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public settings accessible by unauthenticated visitors (e.g. login screen content)
+mainRouter.get('/api/public-settings', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT key, value FROM settings WHERE key IN ('login_page_content')");
+        const settings = {};
+        result.rows.forEach(row => {
+            settings[row.key] = row.value;
+        });
+        res.json(settings);
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Upload image for rich text content (stored in PostgreSQL)
+mainRouter.post('/api/settings/images', authenticateToken, authorizeRoles('Application Administrator'), async (req, res) => {
+    try {
+        const { cleanFilename, mimeType, buffer } = validateImageUpload(req.body);
+        const result = await pool.query(
+            'INSERT INTO uploaded_images (filename, mime_type, data) VALUES ($1, $2, $3) RETURNING id',
+            [cleanFilename, mimeType, buffer]
+        );
+        const id = result.rows[0].id;
+        res.json({
+            id,
+            url: `api/media/${id}`,
+            filename: cleanFilename
+        });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Public stream endpoint for uploaded images
+mainRouter.get('/api/media/:id', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'Invalid image ID' });
+        }
+
+        const result = await pool.query('SELECT mime_type, data, filename FROM uploaded_images WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).send('Image not found');
+        }
+
+        const image = result.rows[0];
+        res.setHeader('Content-Type', image.mime_type);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(image.filename)}"`);
+        res.send(image.data);
     } catch (err) {
         console.error('Error in route:', req.path, err);
         res.status(500).json({ error: err.message });
