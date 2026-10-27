@@ -1,15 +1,39 @@
-import { useState, type FC, type FormEvent } from 'react';
+import { useState, useEffect, type FC, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { startAuthentication } from '@simplewebauthn/browser';
 
+const sanitizeHtml = (html: string) => {
+  if (!html) return '';
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '')
+    .replace(/javascript:/gi, '');
+};
+
 const Login: FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loginContent, setLoginContent] = useState('');
   const { login, checkAuth } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchPublicSettings = async () => {
+      try {
+        const res = await axios.get('api/public-settings');
+        if (res.data?.login_page_content) {
+          setLoginContent(res.data.login_page_content);
+        }
+      } catch (err) {
+        console.warn('Could not load public settings', err);
+      }
+    };
+    fetchPublicSettings();
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -48,7 +72,7 @@ const Login: FC = () => {
   };
 
   return (
-    <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+    <div className="container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', padding: '2rem 1rem' }}>
       <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
         <h2 style={{ textAlign: 'center', color: 'var(--primary-color)' }}>Login</h2>
         {error && <div className="error-message">{error}</div>}
@@ -94,6 +118,15 @@ const Login: FC = () => {
           <Link to="/signup" style={{ color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem' }}>Sign Up</Link>
         </div>
       </div>
+
+      {loginContent && (
+        <div className="card login-rich-content" style={{ width: '100%', maxWidth: '400px', marginTop: '1.5rem', background: '#ffffff' }}>
+          <div
+            className="login-rich-content-display"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(loginContent) }}
+          />
+        </div>
+      )}
     </div>
   );
 };
