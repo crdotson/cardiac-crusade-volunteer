@@ -182,6 +182,33 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 3. **User Management API**: Updated `GET /api/users` across all three supervisor roles (Application Administrator, City Coordinator, Volunteer leader) to select `u.last_login` and `u.created_at`.
 4. **User Management UI (`Users.tsx`)**: Updated `interface User` to include `last_login` and `created_at`. Added a `formatDateTime` helper to render human-readable timestamps (e.g., `Oct 26, 2026, 10:14 PM`) and `Never` if `last_login` is null. Added **Created** and **Last Login** column headers and values to the User Hierarchy table, wrapped in a responsive horizontally-scrollable container.
 
+### Session: Login Screen Rich Content & Picture Management
+**Changes Made:**
+1. **PostgreSQL Image Storage**: Added `uploaded_images` table (`id SERIAL PRIMARY KEY, filename VARCHAR, mime_type VARCHAR, data BYTEA, created_at TIMESTAMPTZ`) in `server/index.js` `initDB()`. This stores uploaded images directly in the database so they persist across Kubernetes pod redeployments and are automatically included in DB backups without requiring a local PVC on the ephemeral app container.
+2. **Backend Image Upload & Streaming Endpoints**:
+   - `POST /api/settings/images`: Authenticated admin-only endpoint. Validates image MIME types (PNG, JPEG, WebP, GIF, SVG) and max size (up to 5MB) using `validateImageUpload` in `server/media-helpers.js`. Inserts binary `BYTEA` into `uploaded_images` and returns `{ url: 'api/media/:id', id }`.
+   - `GET /api/media/:id`: Public image streaming endpoint with long cache headers (`Cache-Control: public, max-age=86400`) and inline `Content-Disposition`.
+   - `GET /api/public-settings`: Public unauthenticated endpoint returning `{ login_page_content }` for login screen rendering.
+   - Raised Express JSON body parser limit to `10mb` (`app.use(express.json({ limit: '10mb' }))`) to accommodate image uploads.
+3. **Frontend WYSIWYG Editor (`RichTextEditor.tsx`)**:
+   - Built a React 19 contentEditable WYSIWYG editor using `lucide-react` icons for Bold, Italic, Underline, Headings (H1/H2/H3/P), Lists, Alignment, Links, Undo/Redo, and Picture Upload.
+   - Picture upload: Automatically uploads selected image files to `api/settings/images` and embeds `<img>` tags at the cursor.
+   - Image controls: Clicking on an embedded image reveals resizing (100%, Medium 260px, Small 140px), alignment (Center, Left), and image deletion controls.
+   - Live Login Preview tab: Allows administrators to instantly preview how the content and graphics will render below the login card before saving.
+4. **Admin Settings Integration (`Settings.tsx`)**:
+   - Added a full-width "Login Screen Rich Content & Pictures" card under Admin Controls.
+   - Fetches and saves `login_page_content` through settings endpoints with a dedicated save button and sync with `handleSaveAdminSettings`.
+5. **Login Page Display (`Login.tsx`)**:
+   - Calls `GET /api/public-settings` on mount and dynamically renders `login_page_content` in a centered responsive card below the login box.
+   - Sanitizes scripts and dangerous inline event handlers (`onload`, `onerror`) to prevent XSS.
+   - Formatted images responsively (`max-width: 100%`) with clean margins and typography.
+6. **Unit Tests**:
+   - Created `server/test/media-helpers.test.js` validating image size limits, supported MIME types, base64 data URL stripping, and filename sanitization.
+
+**Difficulties Encountered:**
+- **Ephemeral App Container Storage**: In the k3s GitOps deployment, only PostgreSQL mounts a PersistentVolumeClaim (`cardiac-crusade-db-pvc`); the application pod has an ephemeral container filesystem. Storing uploaded images on disk would cause them to vanish upon any pod rollout. **Solution:** Images are stored directly in PostgreSQL as `BYTEA` records in `uploaded_images` and streamed via `/api/media/:id`.
+- **Express JSON Body Parser Default Limit**: Express defaults `express.json()` to a 100kb limit, which throws `413 PayloadTooLargeError` when uploading multi-megabyte base64 images. **Solution:** Configured `express.json({ limit: '10mb' })` and `express.urlencoded({ extended: true, limit: '10mb' })`.
+
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
 
