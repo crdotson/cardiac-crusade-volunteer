@@ -2,6 +2,7 @@ import { useState, useEffect, type FC, type FormEvent } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { startRegistration } from '@simplewebauthn/browser';
+import { RichTextEditor } from '../components/RichTextEditor';
 
 const Settings: FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -10,6 +11,8 @@ const Settings: FC = () => {
   const [googlePlacesLimit, setGooglePlacesLimit] = useState('10');
   const [defaultMapCenter, setDefaultMapCenter] = useState('');
   const [defaultMapRadiusMiles, setDefaultMapRadiusMiles] = useState('5');
+  const [loginPageContent, setLoginPageContent] = useState('');
+  const [isSavingContent, setIsSavingContent] = useState(false);
   const [credentials, setCredentials] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -22,6 +25,7 @@ const Settings: FC = () => {
       setGooglePlacesLimit(res.data.google_places_limit || '10');
       setDefaultMapCenter(res.data.default_map_center || '38.0406, -84.5037');
       setDefaultMapRadiusMiles(res.data.default_map_radius_miles || '5');
+      setLoginPageContent(res.data.login_page_content || '');
     } catch (err) {
       console.error('Failed to fetch settings');
     }
@@ -66,11 +70,30 @@ const Settings: FC = () => {
           google_places_limit: googlePlacesLimit,
           default_map_center: defaultMapCenter,
           default_map_radius_miles: defaultMapRadiusMiles,
+          login_page_content: loginPageContent,
         }
       });
       setMessage('Admin settings saved successfully');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save admin settings');
+    }
+  };
+
+  const handleSaveLoginContent = async () => {
+    setError('');
+    setMessage('');
+    setIsSavingContent(true);
+    try {
+      await axios.post('api/settings', {
+        settings: {
+          login_page_content: loginPageContent,
+        }
+      });
+      setMessage('Login screen content saved successfully');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to save login screen content');
+    } finally {
+      setIsSavingContent(false);
     }
   };
 
@@ -209,6 +232,32 @@ const Settings: FC = () => {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button onClick={handleBackup} className="secondary" style={{ flex: 1 }}>Backup DB</button>
               <button onClick={handleRestore} className="secondary" style={{ flex: 1 }}>Restore DB</button>
+            </div>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="card" style={{ gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 style={{ margin: 0 }}>Login Screen Rich Content & Pictures</h3>
+              <span style={{ fontSize: '0.85rem', color: 'var(--gray)' }}>
+                Displayed below the login box on the public login page
+              </span>
+            </div>
+            <p style={{ fontSize: '0.9rem', color: 'var(--gray)', marginTop: 0, marginBottom: '0.75rem' }}>
+              Format text, add bullet points, links, and upload pictures (such as mobile app store QR codes, announcements, or instructions). Uploaded images are stored securely in PostgreSQL.
+            </p>
+            <RichTextEditor value={loginPageContent} onChange={setLoginPageContent} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="primary"
+                onClick={handleSaveLoginContent}
+                disabled={isSavingContent}
+                style={{ padding: '0.5rem 1.25rem', marginBottom: 0 }}
+              >
+                {isSavingContent ? 'Saving...' : 'Save Login Content'}
+              </button>
             </div>
           </div>
         )}
