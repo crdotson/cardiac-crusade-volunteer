@@ -2,6 +2,9 @@
 
 | Task | Status | Notes |
 |---|---|---|
-| Enforce substring matching on place names & paginate Google Places for search-by-name | completed | Added matchesSearchQuery helper and paginated Google Places pages up to targetLimit |
-| Build verification & test validation | completed | Verified node --check server/index.js and npm run build in client (1.94s) |
-| Documentation & commit | completed | Updated GEMINI.md and committing changes |
+| Explore project context | completed | Reviewed auth flow, users table schema, passkey endpoints, login screen |
+| Ask clarifying questions | completed | Auto-assign first City Coordinator (fallback admin); auto-login on signup completion |
+| Propose 2-3 approaches | completed | User selected Approach 1 with sequential password prompt then optional passkey prompt |
+| Present design | in_progress | Presenting architecture, backend endpoints, and frontend user flow |
+| Write design doc | pending | |
+| Transition to implementation | pending | |
