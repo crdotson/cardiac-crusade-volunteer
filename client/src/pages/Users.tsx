@@ -261,7 +261,7 @@ const Users: React.FC = () => {
       </div>
 
       <div className="card">
-        <h2 style={{ color: 'var(--primary-color)' }}>User Hierarchy</h2>
+        <h2 style={{ color: 'var(--primary-color)' }}>Users</h2>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
@@ -270,7 +270,6 @@ const Users: React.FC = () => {
                 <th style={{ padding: '1rem' }}>Name</th>
                 <th style={{ padding: '1rem' }}>Role</th>
                 <th style={{ padding: '1rem' }}>Rolls Up To</th>
-                <th style={{ padding: '1rem' }}>Created</th>
                 <th style={{ padding: '1rem' }}>Last Login</th>
                 <th style={{ padding: '1rem' }}>Actions</th>
               </tr>
@@ -283,9 +282,6 @@ const Users: React.FC = () => {
                   <td style={{ padding: '1rem' }}>{u.role}</td>
                   <td style={{ padding: '1rem' }}>
                     {u.roll_up_to_email || <span style={{ color: 'var(--gray)', fontStyle: 'italic' }}>N/A</span>}
-                  </td>
-                  <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
-                    {formatDateTime(u.created_at)}
                   </td>
                   <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
                     {u.last_login ? (
