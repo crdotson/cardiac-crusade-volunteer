@@ -163,6 +163,18 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 **Difficulties Encountered:**
 - **Google Places Semantic Keyword Overreach:** Google's `places:searchText` endpoint returns businesses based on broad keyword and category associations (e.g. searching "whole foods" returns any grocery store). In addition, semantic matches on page 1 frequently displace actual exact-name matches to page 2 or 3. **Solution:** Always fetch Google pages in full 20-place chunks and continue paginating through `nextPageToken` until `targetLimit` *matching* candidate places are accumulated, filtering out non-substring semantic results at each page step.
 
+### Session: Volunteer Self Sign-Up with Passkey & Password
+**Changes Made:**
+1. **Backend Sign-Up Route (`POST /api/signup`)**: Implemented a public registration endpoint in `server/index.js` supported by helper functions in `server/signup-helpers.js`. Validates email presence/format and optional password (minimum 8 characters; hashes via bcrypt). If passkey-only is selected, stores `password_hash = NULL`.
+2. **Dynamic Hierarchy Auto-Assignment**: Automatically queries `SELECT id FROM users WHERE role = 'City Coordinator' ORDER BY id ASC LIMIT 1`, falling back to `role = 'Application Administrator'` if no City Coordinator exists yet. Assigns the newly registered user to the `Volunteer` role with `roll_up_to_id` pointing to the resolved coordinator.
+3. **Session Issuance & Auto-Login**: Signs a JWT cookie (`token`) on successful account creation, immediately authenticating the user and returning the user object.
+4. **React Sign-Up Page (`client/src/pages/Signup.tsx`)**:
+   - **Step 1 (Form)**: Prompts user for Full Name, Email, Password, and Confirm Password, with an optional "Sign up with Passkey only (no password)" checkbox.
+   - **Step 2 (Passkey Prompt)**: Prompts user: *"Would you like to create a passkey for faster and more secure sign-ins with Face ID, Touch ID, or your device lock?"* with [Create Passkey] and [Skip for Now] actions. Seamlessly executes WebAuthn `startRegistration` and `register-verify`.
+   - On completion or skip, navigates directly to the volunteer dashboard (`/map`).
+5. **Entry Point on Login Screen (`Login.tsx`)**: Added a clear *"Don't have an account? Sign Up"* link beneath the login card leading to `/signup`.
+6. **Unit Tests**: Created `server/test/signup-helper.test.js` covering `determineRollUpId` coordinator fallbacks and `validateSignupPayload` edge cases (normalizing emails, short passwords, passkey-only signup).
+
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
 
