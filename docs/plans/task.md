@@ -2,8 +2,6 @@
 
 | Task | Status | Notes |
 |---|---|---|
-| Task 1: Backend Database Schema & API Endpoints | completed | Added `uploaded_images` table, `validateImageUpload`, `POST /api/settings/images`, `GET /api/media/:id`, `GET /api/public-settings` |
-| Task 2: Frontend RichTextEditor Component | completed | `RichTextEditor.tsx` with toolbar, image upload, live preview, and CSS |
-| Task 3: Admin Settings Integration | completed | Embed editor in `Settings.tsx`, fetch/save `login_page_content` |
-| Task 4: Login Screen Display | completed | Fetch public settings and render rich content below login card in `Login.tsx` |
-| Task 5: Verification & Project Documentation | completed | Build verification passed, 13/13 unit tests passed, and updated `GEMINI.md` |
+| Task 1: Update backend `/api/locations/search` in `server/index.js` | completed | Detect coordinates vs city name, apply `locationRestriction.rectangle` & Haversine filtering |
+| Task 2: Update frontend `CreateImportActions.tsx` and `Map.tsx` | completed | Pass `radiusMiles`, add radius input, and show distance badge |
+| Task 3: Verify client build and test functionality | completed | `npm run build --prefix client` and `node --check server/index.js` succeeded |

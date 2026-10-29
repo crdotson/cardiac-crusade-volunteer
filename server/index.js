@@ -1008,8 +1008,20 @@ mainRouter.patch('/api/locations/:id/notes', authenticateToken, async (req, res)
     }
 });
 
+const haversineDistanceMiles = (lat1, lon1, lat2, lon2) => {
+    const toRad = x => (x * Math.PI) / 180;
+    const R = 3958.8; // Earth radius in miles
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
+
 mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Application Administrator', 'City Coordinator'), async (req, res) => {
-    const { category, city = 'Lexington, KY' } = req.body;
+    let { category, city, radiusMiles } = req.body;
     try {
         const keyRes = await pool.query("SELECT value FROM settings WHERE key = 'google_api_key'");
         const apiKey = keyRes.rows[0]?.value;
@@ -1019,8 +1031,55 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
         const rawLimit = parseInt(limitRes.rows[0]?.value);
         const targetLimit = isNaN(rawLimit) ? 20 : Math.max(1, rawLimit);
 
+        if (!city || typeof city !== 'string' || !city.trim()) {
+            const centerRes = await pool.query("SELECT value FROM settings WHERE key = 'default_map_center'");
+            city = centerRes.rows[0]?.value || 'Lexington, KY';
+        }
+
         const currentLocs = await pool.query('SELECT name, address FROM locations');
-        const query = `${category} in ${city}`;
+
+        // Check if city matches GPS coordinates (lat, lng)
+        let isCoordinates = false;
+        let lat, lng;
+        if (typeof city === 'string') {
+            const parts = city.split(',').map(s => parseFloat(s.trim()));
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && parts[0] >= -90 && parts[0] <= 90 && parts[1] >= -180 && parts[1] <= 180) {
+                isCoordinates = true;
+                lat = parts[0];
+                lng = parts[1];
+            }
+        }
+
+        let miles = parseFloat(radiusMiles);
+        if (isNaN(miles) || miles <= 0) {
+            const radRes = await pool.query("SELECT value FROM settings WHERE key = 'default_map_radius_miles'");
+            const radVal = parseFloat(radRes.rows[0]?.value);
+            miles = (!isNaN(radVal) && radVal > 0) ? radVal : 5;
+        }
+        miles = Math.min(31, miles);
+
+        let query = `${category} in ${city}`.trim();
+        let locationRestriction = null;
+
+        if (isCoordinates) {
+            query = (category || '').trim();
+            const dLat = miles / 69.05;
+            const cosLat = Math.cos((lat * Math.PI) / 180);
+            const dLng = cosLat > 0.0001 ? miles / (69.05 * cosLat) : 180;
+
+            locationRestriction = {
+                rectangle: {
+                    low: {
+                        latitude: Math.max(-90, lat - dLat),
+                        longitude: Math.max(-180, lng - dLng)
+                    },
+                    high: {
+                        latitude: Math.min(90, lat + dLat),
+                        longitude: Math.min(180, lng + dLng)
+                    }
+                }
+            };
+        }
 
         let allResults = [];
         let pageToken = '';
@@ -1029,6 +1088,9 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
         while (allResults.length < targetLimit) {
             const currentLimit = Math.min(pageSize, targetLimit - allResults.length);
             const payload = { textQuery: query, pageSize: currentLimit };
+            if (locationRestriction) {
+                payload.locationRestriction = locationRestriction;
+            }
             if (pageToken) payload.pageToken = pageToken;
 
             const response = await axios.post('https://places.googleapis.com/v1/places:searchText', 
@@ -1037,7 +1099,7 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Goog-Api-Key': apiKey,
-                        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,nextPageToken'
+                        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.internationalPhoneNumber,places.types,places.primaryType,places.primaryTypeDisplayName,nextPageToken'
                     }
                 }
             );
@@ -1054,9 +1116,18 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
         for (const place of allResults) {
             const name = place.displayName?.text || 'Unknown';
             const address = place.formattedAddress || 'No Address';
-            const lat = place.location?.latitude;
-            const lng = place.location?.longitude;
+            const placeLat = place.location?.latitude;
+            const placeLng = place.location?.longitude;
             const phone = place.internationalPhoneNumber || null;
+            const types = place.types || [];
+
+            let distMiles = null;
+            if (isCoordinates && placeLat !== undefined && placeLng !== undefined) {
+                distMiles = haversineDistanceMiles(lat, lng, placeLat, placeLng);
+                if (distMiles > miles) {
+                    continue; // Skip results outside the circular search radius
+                }
+            }
 
             let isDuplicate = false;
             for (const existing of currentLocs.rows) {
@@ -1069,13 +1140,30 @@ mainRouter.post('/api/locations/search', authenticateToken, authorizeRoles('Appl
             }
 
             if (!isDuplicate) {
-                candidates.push({ name, address, lat, lng, phone, category });
+                candidates.push({ 
+                    name, 
+                    address, 
+                    lat: placeLat, 
+                    lng: placeLng, 
+                    phone, 
+                    category,
+                    categories: types,
+                    distance: distMiles !== null ? Math.round(distMiles * 10) / 10 : null
+                });
             }
+        }
+
+        if (isCoordinates) {
+            candidates.sort((a, b) => ((a.distance !== null ? a.distance : 999) - (b.distance !== null ? b.distance : 999)));
         }
 
         res.json(candidates);
     } catch (err) {
-        console.error('Error in search route:', err);
+        const errorData = err.response?.data;
+        console.error('Error in search route:', JSON.stringify(errorData || err.message));
+        if (errorData?.error?.status === 'PERMISSION_DENIED') {
+            return res.status(403).json({ message: `Google API Error: ${errorData.error.message}. Please ensure "Places API (New)" is enabled.` });
+        }
         res.status(500).json({ error: err.message });
     }
 });
@@ -1144,18 +1232,6 @@ mainRouter.post('/api/locations/search-by-name', authenticateToken, authorizeRol
         };
 
         const currentLocs = await pool.query('SELECT name, address FROM locations');
-
-        const haversineDistanceMiles = (lat1, lon1, lat2, lon2) => {
-            const toRad = x => (x * Math.PI) / 180;
-            const R = 3958.8; // Earth radius in miles
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        };
 
         const formatCategory = (p) => {
             if (p.primaryTypeDisplayName?.text) return p.primaryTypeDisplayName.text;

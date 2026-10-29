@@ -40,6 +40,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
   // Category Import state
   const [selectedCategory, setSelectedCategory] = useState('');
   const [importLocation, setImportLocation] = useState('38.0406, -84.5037');
+  const [categoryRadiusInput, setCategoryRadiusInput] = useState<string>('5');
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<number>>(new Set());
   const [filterText, setFilterText] = useState('');
@@ -88,6 +89,7 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
           }
           if (settsRes.data.default_map_radius_miles) {
             setNameRadiusInput(settsRes.data.default_map_radius_miles);
+            setCategoryRadiusInput(settsRes.data.default_map_radius_miles);
           }
         }
       } catch (err) {
@@ -209,7 +211,8 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
     try {
       const res = await axios.post('api/locations/search', {
         category: selectedCategory,
-        city: importLocation
+        city: importLocation,
+        radiusMiles: categoryRadiusInput
       });
       setCandidates(res.data);
       setSelectedCandidates(new Set(res.data.map((_: any, i: number) => i)));
@@ -469,6 +472,20 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                   <label>Search Location (City or Lat/Lng)</label>
                   <input type="text" value={importLocation} onChange={(e) => setImportLocation(e.target.value)} />
                 </div>
+                <div className="form-group">
+                  <label>Search Radius (miles)</label>
+                  <input 
+                    type="number" 
+                    min="0.1" 
+                    max="31" 
+                    step="any" 
+                    placeholder="5" 
+                    value={categoryRadiusInput} 
+                    onChange={(e) => setCategoryRadiusInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                  />
+                  <small style={{ color: '#666', fontSize: '0.8rem' }}>Max 31 miles (used when GPS coordinates are entered)</small>
+                </div>
                 {isImporting ? (
                   <p>Searching... Please wait.</p>
                 ) : (
@@ -514,7 +531,13 @@ const CreateImportActions: React.FC<CreateImportActionsProps> = ({ onUpdate }) =
                           style={{ width: 'auto' }}
                         />
                         <div>
-                          <strong>{c.name}</strong><br />
+                          <strong>{c.name}</strong>
+                          {c.distance !== null && c.distance !== undefined && (
+                            <span style={{ fontSize: '0.8rem', color: '#0066cc', marginLeft: '0.5rem', fontWeight: 'bold' }}>
+                              ({c.distance} mi away)
+                            </span>
+                          )}
+                          <br />
                           <span style={{ fontSize: '0.8rem', color: '#666' }}>{c.address}</span><br />
                           <span style={{ fontSize: '0.8rem', color: '#999' }}>Category: {formatCategoryName(c.category || (c.categories && c.categories[0]))}</span>
                         </div>
