@@ -21,7 +21,7 @@ A comprehensive web application for coordinating volunteers to map Automated Ext
 ### Security
 - **Multi-Method Auth**: Supports Passkeys (FIDO2/WebAuthn), Social Login (Google/Facebook), and OTP-secured Email/Password.
 - **Volunteer Signup**: Accounts are created only after a password or verified passkey is provided. If passkey-only setup fails, return to signup to choose a password; a passkey can be added later in Settings.
-- **Signup testing**: See the [signup defect notes](docs/defect-signup-passkey-skip-pr.md) for the flow, automated tests, and manual retesting steps.
+- **Signup testing**: See the [signup defect notes](docs/pr-docs/defect-signup-passkey-skip-pr.md) for the flow, automated tests, and manual retesting steps.
 - **Admin Controls**: Manage Google API keys and project settings directly from the UI.
 
 ## Local Deployment (Testing)
