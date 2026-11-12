@@ -12,7 +12,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
+  checkAuth: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,8 +29,10 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     try {
       const res = await axios.get('api/me');
       setUser(res.data.user);
+      return true;
     } catch (err) {
       setUser(null);
+      return false;
     } finally {
       setLoading(false);
     }

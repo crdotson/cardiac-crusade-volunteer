@@ -2,7 +2,7 @@ import { useState, type FC, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { startRegistration } from '@simplewebauthn/browser';
+import { startRegistration, type RegistrationResponseJSON } from '@simplewebauthn/browser';
 
 const Signup: FC = () => {
   const [step, setStep] = useState<'form' | 'passkey_prompt'>('form');
@@ -11,7 +11,8 @@ const Signup: FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passkeyOnly, setPasskeyOnly] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [passkeyDisabled, setPasskeyDisabled] = useState(false);
+  const [accountCreated, setAccountCreated] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,20 +34,30 @@ const Signup: FC = () => {
       }
     }
 
+    if (passkeyDisabled) {
+      await finishSignup();
+    } else {
+      setStep('passkey_prompt');
+    }
+  };
+
+  const finishSignup = async (passkey?: { signupToken: string; response: RegistrationResponseJSON }) => {
     setLoading(true);
     try {
-      const res = await axios.post('api/signup', {
+      await axios.post('api/signup', {
         name,
         email,
         password: passkeyOnly ? null : password,
+        passkey,
       });
-
-      if (res.data.success) {
-        setRegisteredEmail(email.trim().toLowerCase());
-        setStep('passkey_prompt');
+      setAccountCreated(true);
+      if (await checkAuth()) {
+        navigate('/map');
+      } else {
+        setError('Your account was created, but automatic sign-in failed. Please log in.');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Sign up failed. Please try again.');
+    } catch (err: unknown) {
+      setError(axios.isAxiosError(err) ? err.response?.data?.message || 'Sign up failed. Please try again.' : 'Sign up failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -56,46 +67,38 @@ const Signup: FC = () => {
     setError('');
     setLoading(true);
     try {
-      const optionsRes = await axios.post('api/auth/fido2/register-options', { email: registeredEmail });
+      const optionsRes = await axios.post('api/signup/passkey-options', { email });
       const regResponse = await startRegistration({
-        optionsJSON: optionsRes.data,
+        optionsJSON: optionsRes.data.options,
       });
-      const verifyRes = await axios.post('api/auth/fido2/register-verify', {
-        email: registeredEmail,
-        body: regResponse,
-        deviceName: 'Primary Device',
-      });
-
-      if (verifyRes.data.verified) {
-        await checkAuth();
-        navigate('/map');
-      } else {
-        setError('Passkey verification failed. You can retry or proceed to the map.');
-      }
-    } catch (err: any) {
+      await finishSignup({ signupToken: optionsRes.data.signupToken, response: regResponse });
+    } catch (err: unknown) {
       console.error('Passkey registration error:', err);
-      setError(err.response?.data?.message || 'Passkey setup was cancelled or not supported on this device. You can still log in with your password.');
+      const message = axios.isAxiosError(err) ? err.response?.data?.message : undefined;
+      setError(message || (passkeyOnly
+        ? 'Passkey setup failed or was cancelled. Retry or return to sign up with a password.'
+        : 'Passkey setup failed or was cancelled. Retry or skip to sign up with your password.'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSkipPasskey = async () => {
-    setLoading(true);
-    try {
-      await checkAuth();
-      navigate('/map');
-    } catch (err) {
-      navigate('/map');
-    } finally {
-      setLoading(false);
-    }
+  const handleReturnToSignup = () => {
+    setPasskeyOnly(false);
+    setPasskeyDisabled(true);
+    setError('');
+    setStep('form');
   };
 
   return (
     <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', padding: '1rem' }}>
       <div className="card" style={{ width: '100%', maxWidth: '440px' }}>
-        {step === 'form' ? (
+        {accountCreated ? (
+          <div style={{ textAlign: 'center' }}>
+            <div className="error-message">{error}</div>
+            <Link to="/login">Log In</Link>
+          </div>
+        ) : step === 'form' ? (
           <>
             <h2 style={{ textAlign: 'center', color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Volunteer Sign Up</h2>
             <p style={{ textAlign: 'center', color: 'var(--gray)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
@@ -128,6 +131,7 @@ const Signup: FC = () => {
                   type="checkbox"
                   id="passkeyOnly"
                   checked={passkeyOnly}
+                  disabled={passkeyDisabled}
                   onChange={(e) => setPasskeyOnly(e.target.checked)}
                   style={{ width: 'auto', margin: 0 }}
                 />
@@ -135,6 +139,7 @@ const Signup: FC = () => {
                   Sign up with Passkey only (no password)
                 </label>
               </div>
+              {passkeyDisabled && <p>Passkey setup is skipped for this signup. You can add a passkey later in Settings.</p>}
 
               {!passkeyOnly && (
                 <>
@@ -200,9 +205,9 @@ const Signup: FC = () => {
               className="secondary"
               style={{ width: '100%' }}
               disabled={loading}
-              onClick={handleSkipPasskey}
+              onClick={passkeyOnly ? handleReturnToSignup : () => void finishSignup()}
             >
-              Skip for Now
+              {passkeyOnly ? 'Return to Sign Up' : 'Skip for Now'}
             </button>
           </div>
         )}
