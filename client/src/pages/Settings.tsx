@@ -3,10 +3,16 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { startRegistration } from '@simplewebauthn/browser';
 import { RichTextEditor } from '../components/RichTextEditor';
+import { Eye, EyeOff } from 'lucide-react';
+import { validatePasswordChange } from '../utils/password-validation';
 
 const Settings: FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [googleApiKey, setGoogleApiKey] = useState('');
   const [googlePlacesLimit, setGooglePlacesLimit] = useState('10');
   const [defaultMapCenter, setDefaultMapCenter] = useState('');
@@ -49,11 +55,22 @@ const Settings: FC = () => {
     e.preventDefault();
     setError('');
     setMessage('');
+
+    const validation = validatePasswordChange(currentPassword, newPassword, confirmPassword);
+    if (!validation.isValid) {
+      setError(validation.error || 'Invalid password input');
+      return;
+    }
+
     try {
       await axios.post('api/settings/change-password', { currentPassword, newPassword });
       setMessage('Password updated successfully');
       setCurrentPassword('');
       setNewPassword('');
+      setConfirmPassword('');
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update password');
     }
@@ -161,10 +178,74 @@ const Settings: FC = () => {
         <div className="card">
           <h3>Security</h3>
           <form onSubmit={handleChangePassword}>
-            <label>Current Password</label>
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-            <label>New Password</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+            <label htmlFor="current-password">Current Password</label>
+            <div className="password-input-wrapper">
+              <input
+                id="current-password"
+                name="current-password"
+                type={showCurrentPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowCurrentPassword((prev) => !prev)}
+                aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                tabIndex={-1}
+              >
+                {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
+            <label htmlFor="new-password">New Password</label>
+            <div className="password-input-wrapper">
+              <input
+                id="new-password"
+                name="new-password"
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+                minLength={8}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowNewPassword((prev) => !prev)}
+                aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                tabIndex={-1}
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
+            <label htmlFor="confirm-new-password">Confirm New Password</label>
+            <div className="password-input-wrapper">
+              <input
+                id="confirm-new-password"
+                name="confirm-new-password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+                minLength={8}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                aria-label={showConfirmPassword ? 'Hide confirm new password' : 'Show confirm new password'}
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
             <button type="submit" className="primary" style={{ width: '100%', marginBottom: '1rem' }}>Update Password</button>
           </form>
           <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />
