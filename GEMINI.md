@@ -219,6 +219,17 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 **Difficulties Encountered:**
 - **Google Places Text Search Coordinate Handling**: Google Places API (New) `places:searchText` treats latitude/longitude strings in `textQuery` as literal keyword search tokens. Finding no venue with that text, it strips the coordinates and defaults to unconstrained IP-based biasing (returning California venues). By detecting coordinates and transferring them to `locationRestriction.rectangle` while sending clean category text in `textQuery`, searches around GPS coordinates reliably return local results.
 
+### Session: Password Settings - Typo Prevention Assistance (Issue #8)
+**Changes Made:**
+1. **Password Change Validation Helper**: Created `client/src/utils/password-validation.ts` to centralize validation for password changes: enforces non-empty current password, minimum length of 8 characters for new password, and matching confirmation password. Added unit tests in `client/src/utils/password-validation.test.js`.
+2. **Password Visibility Toggles**: Added independent show/hide visibility toggles (`Eye` / `EyeOff` from `lucide-react`) to all three password fields in `Settings.tsx` (Current Password, New Password, Confirm New Password).
+3. **Confirm New Password Field**: Added a "Confirm New Password" field to the Security card in `Settings.tsx` with client-side match validation to prevent accidental typos when updating passwords.
+4. **Password Manager Autocomplete Attributes**: Added standard `autoComplete="current-password"`, `autoComplete="new-password"`, and standard `id`/`name` attributes (`current-password`, `new-password`, `confirm-new-password`) to ensure full compatibility with password managers (1Password, Bitwarden, Apple Keychain, Google Password Manager).
+5. **CSS Styling**: Added `.password-input-wrapper` and `.password-toggle-btn` classes to `client/src/index.css` for clean relative positioning and accessible toggle button styling.
+
+**Difficulties Encountered:**
+- None. Tested via Node's test runner and verified clean compilation with `npm run build --prefix client`.
+
 ### Multi-Instance Deployment Playbook
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
 
