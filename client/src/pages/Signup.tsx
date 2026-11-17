@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { startRegistration, type RegistrationResponseJSON } from '@simplewebauthn/browser';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Signup: FC = () => {
   const [step, setStep] = useState<'form' | 'passkey_prompt'>('form');
@@ -10,6 +11,8 @@ const Signup: FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passkeyOnly, setPasskeyOnly] = useState(false);
   const [passkeyDisabled, setPasskeyDisabled] = useState(false);
   const [accountCreated, setAccountCreated] = useState(false);
@@ -143,23 +146,51 @@ const Signup: FC = () => {
 
               {!passkeyOnly && (
                 <>
-                  <label>Password (min. 8 characters)</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required={!passkeyOnly}
-                    minLength={8}
-                  />
+                  <label htmlFor="new-password">Password (min. 8 characters)</label>
+                  <div className="password-input-wrapper">
+                    <input
+                      id="new-password"
+                      name="new-password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="new-password"
+                      required={!passkeyOnly}
+                      minLength={8}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
 
-                  <label>Confirm Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required={!passkeyOnly}
-                    minLength={8}
-                  />
+                  <label htmlFor="confirm-new-password">Confirm Password</label>
+                  <div className="password-input-wrapper">
+                    <input
+                      id="confirm-new-password"
+                      name="confirm-new-password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                      required={!passkeyOnly}
+                      minLength={8}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      tabIndex={-1}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </>
               )}
 
