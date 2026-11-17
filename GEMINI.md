@@ -226,6 +226,7 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 3. **Confirm New Password Field**: Added a "Confirm New Password" field to the Security card in `Settings.tsx` with client-side match validation to prevent accidental typos when updating passwords.
 4. **Password Manager Autocomplete Attributes**: Added standard `autoComplete="current-password"`, `autoComplete="new-password"`, and standard `id`/`name` attributes (`current-password`, `new-password`, `confirm-new-password`) to ensure full compatibility with password managers (1Password, Bitwarden, Apple Keychain, Google Password Manager).
 5. **CSS Styling**: Added `.password-input-wrapper` and `.password-toggle-btn` classes to `client/src/index.css` for clean relative positioning and accessible toggle button styling.
+6. **Signup Page Password Visibility & Attributes**: Added independent show/hide visibility toggles (`Eye` / `EyeOff` from `lucide-react`) to the Password and Confirm Password fields in `Signup.tsx`, along with standard `autoComplete="new-password"` and matching `id`/`name` attributes for password manager compatibility.
 
 **Difficulties Encountered:**
 - None. Tested via Node's test runner and verified clean compilation with `npm run build --prefix client`.
