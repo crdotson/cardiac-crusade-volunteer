@@ -2,6 +2,5 @@
 
 | Task | Status | Notes |
 |---|---|---|
-| Task 1: Update backend `/api/locations/search` in `server/index.js` | completed | Detect coordinates vs city name, apply `locationRestriction.rectangle` & Haversine filtering |
-| Task 2: Update frontend `CreateImportActions.tsx` and `Map.tsx` | completed | Pass `radiusMiles`, add radius input, and show distance badge |
-| Task 3: Verify client build and test functionality | completed | `npm run build --prefix client` and `node --check server/index.js` succeeded |
+| Task 1: Password Change Validation Helper & Unit Tests | completed | Created client/src/utils/password-validation.ts and test suite passing |
+| Task 2: Update Settings Page with Visibility Toggles, Confirm Password & Autocomplete Attributes | completed | Updated Settings.tsx and index.css; tests & client build pass |
