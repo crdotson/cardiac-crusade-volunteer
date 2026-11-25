@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { HelpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar: React.FC = () => {
@@ -27,6 +28,9 @@ const Navbar: React.FC = () => {
       <div className="nav-user-controls">
         <span className="user-email">{user.email}</span>
         <span className="user-role">({user.role})</span>
+        <Link to="/feedback" title="Feedback" aria-label="Feedback" className="settings-link" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'var(--primary-color)' }}>
+          <HelpCircle size={20} />
+        </Link>
         <Link to="/settings" title={`Settings (v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''})`} className="settings-link" style={{ display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
           <span style={{ fontSize: '1.2rem' }}>⚙️</span>
         </Link>

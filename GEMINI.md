@@ -235,3 +235,11 @@ The application is deployed on a k3s cluster (`stormbringer`) using a GitOps wor
 When spinning up a new instance of the application for a new region/domain, **always consult `docs/playbooks/new-site-deployment.md`**. It documents the complete process for patching Tekton, provisioning ArgoCD, generating TLS certificates via `acme.sh`, securing the admin account, cloning API keys, and setting dynamic map coordinates!
 
 
+
+### Session: Internal Feedback Log & Configurable SMTP Notifications (Issue #7)
+**Changes Made:**
+1. **Database Schema & Settings Defaults**: Added a `feedback` table (`id`, `user_id`, `user_email`, `user_name`, `message`, `status`, `email_sent`, `email_error`, `created_at`) and seeded default SMTP settings (`smtp_host` defaulting to `192.168.205.12`, `smtp_port` defaulting to `25`, `smtp_from`, `smtp_user`, `smtp_pass`) in `server/index.js` `initDB()`.
+2. **Backend Feedback Module**: Created `server/feedback-helpers.js` and `server/feedback-routes.js` with `GET /api/feedback` (all entries for `Application Administrator`, own entries for other users), `POST /api/feedback` (persists to `feedback` and sends email via `nodemailer` to all `Application Administrator` users, recording `email_sent` / `email_error` without failing the request if SMTP is unreachable), and `PATCH /api/feedback/:id` (admin status toggle between `New` and `Reviewed`). Filtered `smtp_*` keys out of `GET /api/settings` for non-admin users.
+3. **Frontend Feedback Page & Navigation**: Added a `?` (`HelpCircle`) icon next to the `⚙️` Settings icon in `Navbar.tsx` linking to `/feedback`. Created `client/src/pages/Feedback.tsx` with a free-form feedback form and a history view (full internal log with email delivery status and review toggle for admins; own submissions for regular users), and wired `/feedback` in `client/src/App.tsx`.
+4. **Admin SMTP Settings**: Added Email Server (SMTP) configuration inputs (`smtp_host`, `smtp_port`, `smtp_from`, `smtp_user`, `smtp_pass`) to the Admin Controls card in `client/src/pages/Settings.tsx`.
+5. **Testing**: Added unit tests in `server/test/feedback-routes.test.js` covering message validation, SMTP config defaults/overrides, email delivery success/failure fallback, role-scoped `GET /api/feedback`, and admin-only `PATCH /api/feedback/:id`.

@@ -6,6 +6,7 @@ import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Feedback from './pages/Feedback';
 import Map from './pages/Map';
 import List from './pages/List';
 import LocationDetails from './pages/LocationDetails';
@@ -66,6 +67,12 @@ function App() {
             <Route path="/settings" element={
               <PrivateRoute>
                 <Settings />
+              </PrivateRoute>
+            } />
+
+            <Route path="/feedback" element={
+              <PrivateRoute>
+                <Feedback />
               </PrivateRoute>
             } />
 

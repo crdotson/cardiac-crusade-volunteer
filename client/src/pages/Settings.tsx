@@ -21,6 +21,11 @@ const Settings: FC = () => {
   const [googlePlacesLimit, setGooglePlacesLimit] = useState('10');
   const [defaultMapCenter, setDefaultMapCenter] = useState('');
   const [defaultMapRadiusMiles, setDefaultMapRadiusMiles] = useState('5');
+  const [smtpHost, setSmtpHost] = useState('192.168.205.12');
+  const [smtpPort, setSmtpPort] = useState('25');
+  const [smtpFrom, setSmtpFrom] = useState('noreply@cardiaccrusade.org');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
   const [loginPageContent, setLoginPageContent] = useState('');
   const [isSavingContent, setIsSavingContent] = useState(false);
   const [credentials, setCredentials] = useState<any[]>([]);
@@ -35,6 +40,11 @@ const Settings: FC = () => {
       setGooglePlacesLimit(res.data.google_places_limit || '10');
       setDefaultMapCenter(res.data.default_map_center || '38.0406, -84.5037');
       setDefaultMapRadiusMiles(res.data.default_map_radius_miles || '5');
+      setSmtpHost(res.data.smtp_host || '192.168.205.12');
+      setSmtpPort(res.data.smtp_port || '25');
+      setSmtpFrom(res.data.smtp_from || 'noreply@cardiaccrusade.org');
+      setSmtpUser(res.data.smtp_user || '');
+      setSmtpPass(res.data.smtp_pass || '');
       setLoginPageContent(res.data.login_page_content || '');
     } catch (err) {
       console.error('Failed to fetch settings');
@@ -120,6 +130,11 @@ const Settings: FC = () => {
           google_places_limit: googlePlacesLimit,
           default_map_center: defaultMapCenter,
           default_map_radius_miles: defaultMapRadiusMiles,
+          smtp_host: smtpHost,
+          smtp_port: smtpPort,
+          smtp_from: smtpFrom,
+          smtp_user: smtpUser,
+          smtp_pass: smtpPass,
           login_page_content: loginPageContent,
         }
       });
@@ -393,6 +408,18 @@ const Settings: FC = () => {
               <input type="text" value={defaultMapCenter} onChange={(e) => setDefaultMapCenter(e.target.value)} />
               <label>Default Map Radius (Miles)</label>
               <input type="number" step="0.1" value={defaultMapRadiusMiles} onChange={(e) => setDefaultMapRadiusMiles(e.target.value)} />
+              <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />
+              <h4 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Email Server (SMTP)</h4>
+              <label>SMTP Host</label>
+              <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="192.168.205.12" />
+              <label>SMTP Port</label>
+              <input type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="25" />
+              <label>From Email Address</label>
+              <input type="email" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} placeholder="noreply@cardiaccrusade.org" />
+              <label>SMTP Username (Optional)</label>
+              <input type="text" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} autoComplete="off" />
+              <label>SMTP Password (Optional)</label>
+              <input type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} autoComplete="new-password" />
               <button type="submit" className="primary" style={{ width: '100%', marginBottom: '1rem' }}>Save Admin Settings</button>
             </form>
             <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />

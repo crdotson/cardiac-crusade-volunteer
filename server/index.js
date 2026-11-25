@@ -18,6 +18,7 @@ import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import 'dotenv/config';
 import { createSignupRouter } from './signup-routes.js';
 import { createAccountRouter } from './account-routes.js';
+import { createFeedbackRouter } from './feedback-routes.js';
 import { normalizeAndValidateEmail } from './account-helpers.js';
 import { validateImageUpload } from './media-helpers.js';
 
@@ -165,6 +166,20 @@ async function initDB() {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS feedback (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          user_email VARCHAR(255) NOT NULL,
+          user_name VARCHAR(255),
+          message TEXT NOT NULL,
+          status VARCHAR(50) DEFAULT 'New',
+          email_sent BOOLEAN DEFAULT FALSE,
+          email_error TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
       
       const adminEmail = 'chris@dotson97.org';
       const adminPassword = 'changeme';
@@ -182,6 +197,11 @@ async function initDB() {
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['default_map_center', '38.0406, -84.5037']);
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['default_map_radius_miles', '5']);
       await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['login_page_content', '']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['smtp_host', '192.168.205.12']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['smtp_port', '25']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['smtp_from', 'noreply@cardiaccrusade.org']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['smtp_user', '']);
+      await pool.query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['smtp_pass', '']);
 
       console.log('Database initialized');
       break;
@@ -234,6 +254,7 @@ const currentChallenges = new Map();
 
 mainRouter.use(createSignupRouter({ pool, jwtSecret: JWT_SECRET, rpId: RP_ID, origin: ORIGIN }));
 mainRouter.use(createAccountRouter({ pool, jwtSecret: JWT_SECRET, authenticateToken }));
+mainRouter.use(createFeedbackRouter({ pool, authenticateToken, authorizeRoles }));
 
 mainRouter.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
@@ -743,7 +764,11 @@ mainRouter.get('/api/settings', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM settings');
         const settings = {};
+        const isAdmin = req.user.role === 'Application Administrator';
         result.rows.forEach(row => {
+            if (!isAdmin && row.key.startsWith('smtp_')) {
+                return;
+            }
             settings[row.key] = row.value;
         });
         res.json(settings);

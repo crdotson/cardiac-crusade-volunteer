@@ -1,7 +1,9 @@
 # Task Tracker
 
-| Task | Status | Notes |
-|---|---|---|
-| Task 1: Password Change Validation Helper & Unit Tests | completed | Created client/src/utils/password-validation.ts and test suite passing |
-| Task 2: Update Settings Page with Visibility Toggles, Confirm Password & Autocomplete Attributes | completed | Updated Settings.tsx and index.css; tests & client build pass |
-| Task 3: Update Signup Page with Visibility Toggles and Autocomplete Attributes | completed | Updated Signup.tsx with Eye/EyeOff toggles, autoComplete="new-password", id/name attributes; verified build |
+| Step | Task | Status |
+| :--- | :--- | :--- |
+| 1 | Write design doc (`docs/plans/2026-11-25-feedback-log-design.md`) | Done |
+| 2 | Implement backend (`feedback-helpers.js`, `feedback-routes.js`, `server/index.js`) | Done |
+| 3 | Implement backend unit tests (`server/test/feedback-routes.test.js`) | Done |
+| 4 | Implement frontend (`Feedback.tsx`, `Navbar.tsx`, `Settings.tsx`, `App.tsx`) | Done |
+| 5 | Run tests and client build, update `GEMINI.md` | Done |
