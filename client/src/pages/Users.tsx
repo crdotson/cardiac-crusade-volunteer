@@ -25,7 +25,7 @@ const Users: React.FC = () => {
   const [importData, setImportData] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, checkAuth } = useAuth();
 
   const fetchUsers = async () => {
     try {
@@ -182,9 +182,13 @@ const Users: React.FC = () => {
         role: editingUser.role,
         roll_up_to_id 
       });
+      const editedSelf = editingUser.id === currentUser?.id;
       setMessage('User updated successfully');
       setEditingUser(null);
       fetchUsers();
+      if (editedSelf) {
+        await checkAuth();
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update user');
     }

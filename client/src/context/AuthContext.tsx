@@ -5,6 +5,7 @@ interface User {
   id: number;
   email: string;
   role: string;
+  hasPassword?: boolean;
 }
 
 interface AuthContextType {

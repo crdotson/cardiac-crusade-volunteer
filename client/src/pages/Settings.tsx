@@ -13,6 +13,10 @@ const Settings: FC = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [googleApiKey, setGoogleApiKey] = useState('');
   const [googlePlacesLimit, setGooglePlacesLimit] = useState('10');
   const [defaultMapCenter, setDefaultMapCenter] = useState('');
@@ -22,7 +26,7 @@ const Settings: FC = () => {
   const [credentials, setCredentials] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
 
   const fetchSettings = async () => {
     try {
@@ -50,6 +54,35 @@ const Settings: FC = () => {
     fetchSettings();
     fetchCredentials();
   }, []);
+
+  const handleChangeEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+
+    const trimmedEmail = newEmail.trim();
+    if (!trimmedEmail) {
+      setError('New email address is required');
+      return;
+    }
+
+    setIsUpdatingEmail(true);
+    try {
+      await axios.post('api/settings/change-email', {
+        newEmail: trimmedEmail,
+        currentPassword: emailPassword,
+      });
+      await checkAuth();
+      setMessage('Email address updated successfully');
+      setNewEmail('');
+      setEmailPassword('');
+      setShowEmailPassword(false);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update email address');
+    } finally {
+      setIsUpdatingEmail(false);
+    }
+  };
 
   const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault();
@@ -177,6 +210,60 @@ const Settings: FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
         <div className="card">
           <h3>Security</h3>
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ fontSize: '0.9rem', color: 'var(--gray)', marginBottom: '0.75rem' }}>
+              Current Email: <strong>{user?.email}</strong>
+            </div>
+            <form onSubmit={handleChangeEmail}>
+              <label htmlFor="new-email">New Email Address</label>
+              <input
+                id="new-email"
+                name="new-email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                autoComplete="email"
+                placeholder="Enter new email address"
+                required
+              />
+
+              {user?.hasPassword !== false && (
+                <>
+                  <label htmlFor="email-current-password">Current Password</label>
+                  <div className="password-input-wrapper">
+                    <input
+                      id="email-current-password"
+                      name="email-current-password"
+                      type={showEmailPassword ? 'text' : 'password'}
+                      value={emailPassword}
+                      onChange={(e) => setEmailPassword(e.target.value)}
+                      autoComplete="current-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowEmailPassword((prev) => !prev)}
+                      aria-label={showEmailPassword ? 'Hide current password' : 'Show current password'}
+                      tabIndex={-1}
+                    >
+                      {showEmailPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <button
+                type="submit"
+                className="primary"
+                disabled={isUpdatingEmail}
+                style={{ width: '100%', marginBottom: '0.5rem' }}
+              >
+                {isUpdatingEmail ? 'Updating Email...' : 'Update Email'}
+              </button>
+            </form>
+          </div>
+          <hr style={{ margin: '1rem 0', borderColor: 'var(--light-gray)' }} />
           <form onSubmit={handleChangePassword}>
             <label htmlFor="current-password">Current Password</label>
             <div className="password-input-wrapper">

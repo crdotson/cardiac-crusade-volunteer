@@ -17,6 +17,8 @@ import {
 import { isoUint8Array } from '@simplewebauthn/server/helpers';
 import 'dotenv/config';
 import { createSignupRouter } from './signup-routes.js';
+import { createAccountRouter } from './account-routes.js';
+import { normalizeAndValidateEmail } from './account-helpers.js';
 import { validateImageUpload } from './media-helpers.js';
 
 const __dirname = import.meta.dirname;
@@ -231,11 +233,12 @@ const currentChallenges = new Map();
 // --- Auth Endpoints ---
 
 mainRouter.use(createSignupRouter({ pool, jwtSecret: JWT_SECRET, rpId: RP_ID, origin: ORIGIN }));
+mainRouter.use(createAccountRouter({ pool, jwtSecret: JWT_SECRET, authenticateToken }));
 
 mainRouter.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
         if (result.rows.length > 0) {
             const user = result.rows[0];
             if (!user.password_hash) {
@@ -246,7 +249,7 @@ mainRouter.post('/api/login', async (req, res) => {
                 await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
                 const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
                 res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
-                res.json({ success: true, user: { id: user.id, email: user.email, role: user.role } });
+                res.json({ success: true, user: { id: user.id, email: user.email, role: user.role, hasPassword: Boolean(user.password_hash) } });
             } else {
                 res.status(401).json({ success: false, message: 'Invalid credentials' });
             }
@@ -264,8 +267,20 @@ mainRouter.post('/api/logout', (req, res) => {
     res.json({ success: true });
 });
 
-mainRouter.get('/api/me', authenticateToken, (req, res) => {
-    res.json({ user: req.user });
+mainRouter.get('/api/me', authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, email, role, (password_hash IS NOT NULL) AS "hasPassword" FROM users WHERE id = $1',
+            [req.user.id]
+        );
+        if (result.rows.length === 0) {
+            return res.sendStatus(401);
+        }
+        res.json({ user: result.rows[0] });
+    } catch (err) {
+        console.error('Error in route:', req.path, err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- FIDO2 (WebAuthn) ---
@@ -273,7 +288,7 @@ mainRouter.get('/api/me', authenticateToken, (req, res) => {
 mainRouter.post('/api/auth/fido2/register-options', async (req, res) => {
     const { email } = req.body;
     try {
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
         const user = result.rows[0];
         
         const options = await generateRegistrationOptions({
@@ -328,7 +343,7 @@ mainRouter.post('/api/auth/fido2/register-verify', async (req, res) => {
                 deviceName: deviceName || body.authenticatorAttachment || 'Unknown Device',
             };
 
-            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+            const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
             if (result.rows.length > 0) {
                 const user = result.rows[0];
                 const updatedCredentials = [...(user.fido2_credentials || []), newCredential];
@@ -353,7 +368,7 @@ mainRouter.post('/api/auth/fido2/login-options', async (req, res) => {
     try {
         let user = null;
         if (email) {
-            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+            const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
             user = result.rows[0];
         }
 
@@ -382,7 +397,7 @@ mainRouter.post('/api/auth/fido2/login-verify', async (req, res) => {
     try {
         let user;
         if (email) {
-            const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+            const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
             user = result.rows[0];
         } else {
             // Discoverable login: search all users for this credentialID
@@ -422,7 +437,7 @@ mainRouter.post('/api/auth/fido2/login-verify', async (req, res) => {
 
             const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
             res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
-            res.json({ verified: true, user: { id: user.id, email: user.email, role: user.role } });
+            res.json({ verified: true, user: { id: user.id, email: user.email, role: user.role, hasPassword: Boolean(user.password_hash) } });
         } else {
             res.status(400).json({ verified: false });
         }
@@ -470,7 +485,7 @@ mainRouter.delete('/api/auth/fido2/credentials/:id', authenticateToken, async (r
 mainRouter.post('/api/auth/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
-        const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const userRes = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email]);
         if (userRes.rows.length === 0) {
             return res.json({ success: true, message: 'If that email exists, an OTP has been sent.' });
         }
@@ -682,7 +697,21 @@ mainRouter.patch('/api/users/:id', authenticateToken, authorizeRoles('Applicatio
             // Admins can set any role
         }
 
-        const newEmail = email !== undefined ? email : targetUser.email;
+        let newEmail = targetUser.email;
+        if (email !== undefined) {
+            try {
+                newEmail = normalizeAndValidateEmail(email);
+            } catch (validationErr) {
+                return res.status(400).json({ message: validationErr.message });
+            }
+            const existing = await pool.query(
+                'SELECT id FROM users WHERE LOWER(email) = $1 AND id != $2',
+                [newEmail, targetId]
+            );
+            if (existing.rows.length > 0) {
+                return res.status(400).json({ message: 'An account with this email already exists' });
+            }
+        }
         const newName = name !== undefined ? name : targetUser.name;
         const newRole = role !== undefined ? role : targetUser.role;
         const newRollUpTo = roll_up_to_id !== undefined ? roll_up_to_id : targetUser.roll_up_to_id;
@@ -691,6 +720,16 @@ mainRouter.patch('/api/users/:id', authenticateToken, authorizeRoles('Applicatio
             'UPDATE users SET email=$1, name=$2, role=$3, roll_up_to_id=$4 WHERE id=$5',
             [newEmail, newName, newRole, newRollUpTo, targetId]
         );
+
+        if (newEmail.toLowerCase() !== (targetUser.email || '').toLowerCase()) {
+            await pool.query('DELETE FROM otp_storage WHERE LOWER(email) = LOWER($1)', [targetUser.email]);
+        }
+
+        if (String(targetId) === String(req.user.id)) {
+            const token = jwt.sign({ id: targetUser.id, email: newEmail, role: newRole }, JWT_SECRET, { expiresIn: '24h' });
+            res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+        }
+
         res.json({ success: true });
     } catch (err) {
         console.error('Error in route:', req.path, err);
